@@ -10,8 +10,14 @@ variable "skip_external_resources" {
   default     = false
 }
 
+variable "use_kubernetes" {
+  description = "Whether to use Kubernetes backend and fetch credentials from cluster secrets"
+  type        = bool
+  default     = true
+}
+
 variable "config_path" {
-  description = "Path to kubeconfig"
+  description = "Path to kubeconfig (only used when use_kubernetes = true)"
   type        = string
   default     = "~/.kube/config"
 }
@@ -19,10 +25,22 @@ variable "config_path" {
 variable "keycloak_namespace" {
   description = "Namespace where Keycloak is deployed"
   type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,62}$", var.keycloak_namespace))
+    error_message = "keycloak_namespace must be a valid Kubernetes namespace name."
+  }
+}
+
+variable "keycloak_username" {
+  description = "Keycloak admin username (required when use_kubernetes = false)"
+  type        = string
+  default     = "admin"
+  sensitive   = true
 }
 
 variable "keycloak_password" {
-  description = "Optional Keycloak admin password override (if not provided via cluster secret)"
+  description = "Keycloak admin password (required when use_kubernetes = false)"
   type        = string
   default     = ""
   sensitive   = true
@@ -30,6 +48,17 @@ variable "keycloak_password" {
 
 variable "keycloak_url" {
   description = "URL of keycloak"
+  type        = string
+
+  validation {
+    condition     = can(regex("^https?://", var.keycloak_url))
+    error_message = "keycloak_url must start with http:// or https://."
+  }
+}
+
+variable "keycloak_admin_secret" {
+  description = "Name of the secret containing the admin credentials for keycloak"
+  default     = "authserver-admin"
   type        = string
 }
 
@@ -44,4 +73,9 @@ variable "pdp_scopes" {
   description = "List of additional PDP scopes"
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = alltrue([for s in var.pdp_scopes : can(regex("^[a-zA-Z0-9_:-]+$", s))])
+    error_message = "Each pdp_scope must only contain alphanumeric characters, underscores, colons, or hyphens."
+  }
 }

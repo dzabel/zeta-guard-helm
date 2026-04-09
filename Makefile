@@ -29,8 +29,10 @@ LOCK ?= Chart.lock
 SUBCHARTS := $(wildcard charts/*/Chart.yaml)
 # Database bootstrap mode for local convenience targets
 DB_MODE ?= cloudnative
+# Terraform config variables
 TF_PATH := terraform/authserver
 TF_VAR_config_path ?= "~/.kube/config"
+TF_VAR_use_kubernetes ?= true
 
 # Enforce SMB keystore vars for most targets (skip helper-only targets)
 ifeq ($(filter help deps lint template-demo yamllint generate-asl-identity-secret,$(MAKECMDGOALS)),)
@@ -64,6 +66,11 @@ FORCE:
 
 help: ## Show available targets, usage, and effective vars
 	@awk 'BEGIN {FS=":.*## "}; /^[a-zA-Z0-9_.-]+:.*## /{printf "  %-25s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+ifneq ($(wildcard private/),)
+	@echo
+	@echo "Targets requiring private/:"
+	@awk 'BEGIN {FS=":.*##! "}; /^[a-zA-Z0-9_.-]+:.*##! /{printf "  %-25s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+endif
 	@echo
 	@echo "Usage: make <target> [stage=<env>] [namespace=<ns>] [values=<path>]"
 	@echo "       stage defaults to 'local' when omitted"
@@ -91,7 +98,7 @@ deps: ## Vendor chart dependencies (umbrella + zeta-guard)
 
 ### CHARTS
 install-cert-manager: ## Install or upgrade cert-manager (cluster-wide, including CRDs)
-	helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.18.2 -n cert-manager --create-namespace --set crds.enabled=true
+	helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.20.1 -n cert-manager --create-namespace --set crds.enabled=true
 
 install-metrics-server: ## Install metrics-server and patch args for local KIND kubelets
 	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
@@ -197,14 +204,19 @@ deploy-debug: $(LOCK) ## Install/upgrade the release with debug output (wait + t
 
 
 ### CONFIGURATION ###
-config: ## Configure deployed authserver through terraform
-	# initialise terraform backend
-	@echo "config_path = \"$(TF_VAR_config_path)\"" > terraform/authserver/environments/$(STAGE).backend.hcl
-	@echo "namespace   = \"$(NAMESPACE)\"" >> terraform/authserver/environments/$(STAGE).backend.hcl
+generate-main-and-backend: ## Generates main.tf and backend depending on k8s usage
+	cd terraform/authserver && \
+	STAGE=$(STAGE) NAMESPACE=$(NAMESPACE) TF_VAR_use_kubernetes=$(TF_VAR_use_kubernetes) TF_VAR_config_path=$(TF_VAR_config_path) \
+	./generate-main-and-backend.sh
+
+config-init: ## Run generate-main-and-backend and initialise terraform backend
+	$(MAKE) generate-main-and-backend
 	terraform -chdir=$(TF_PATH) init \
 		-backend-config=environments/$(STAGE).backend.hcl \
 		-reconfigure
 
+config: ## Configure deployed authserver through terraform
+	$(MAKE) config-init
 	# apply
 	terraform -chdir=$(TF_PATH) apply \
 		-var-file=../../$(VALUES_DIR)$(STAGE).tfvars \
@@ -212,13 +224,7 @@ config: ## Configure deployed authserver through terraform
 		-auto-approve
 
 config-plan: ## List changes that would be made to the stage (by make config)
-	# initialise terraform backend
-	@echo "config_path = \"$(TF_VAR_config_path)\"" > terraform/authserver/environments/$(STAGE).backend.hcl
-	@echo "namespace   = \"$(NAMESPACE)\"" >> terraform/authserver/environments/$(STAGE).backend.hcl
-	terraform -chdir=$(TF_PATH) init \
-		-backend-config=environments/$(STAGE).backend.hcl \
-		-reconfigure
-
+	$(MAKE) config-init
 	# plan (list changes against current tf-state; skip external scripts)
 	terraform -chdir=$(TF_PATH) plan \
     	-var-file=../../$(VALUES_DIR)$(STAGE).tfvars \
@@ -226,19 +232,15 @@ config-plan: ## List changes that would be made to the stage (by make config)
     	-var="skip_external_resources=true"
 
 config-import: ## For development and troubleshooting only - imports configuration not yet managed by terraform
-	@echo "config_path = \"$(TF_VAR_config_path)\"" > terraform/authserver/environments/$(STAGE).backend.hcl
-	@echo "namespace   = \"$(NAMESPACE)\"" >> terraform/authserver/environments/$(STAGE).backend.hcl
-
-	terraform -chdir=$(TF_PATH) init \
-           -backend-config=environments/$(STAGE).backend.hcl \
-           -reconfigure
-
+	$(MAKE) config-init
+	# import
 	terraform -chdir=$(TF_PATH) import \
 		  -var-file=../../$(VALUES_DIR)$(STAGE).tfvars \
 		  -var "keycloak_password=$(TF_VAR_keycloak_password)" \
 		  -var="skip_external_resources=true" \
 		  keycloak_realm.pdp_realm zeta-guard \
 		  || echo "Realm not found or cannot be imported, will be created on apply";
+
 
 ### STATUS ###
 status: ## Show Helm release status in the namespace
@@ -255,7 +257,7 @@ uninstall: ## Uninstall the release from the namespace
 
 clean: ## Remove the generated rendered.yaml and terraform files
 	rm -f rendered.yaml
-	rm -rf $(TF_PATH)/.terraform $(TF_PATH)/terraform.tfstate* $(TF_PATH)/.terraform.lock.hcl
+	rm -rf $(TF_PATH)/.terraform $(TF_PATH)/terraform.tfstate* $(TF_PATH)/.terraform.lock.hcl $(TF_PATH)/main.tf
 	@find $(TF_PATH)/environments -type f -name '*.backend.hcl' ! -name 'demo.backend.hcl' -delete
 
 trivy: ## scans a Kubernetes namespace for vulnerabilities, misconfigurations and exposed secrets. Requires trivy
@@ -308,7 +310,7 @@ KIND_INGRESS_HOSTS_ESCAPED := $(shell printf '%s' "$(KIND_INGRESS_HOSTS)" | sed 
 myip:
 	echo $(HOST_IP)
 
-kind-up: ## Create KIND cluster, patch CoreDNS, create ns and required secrets
+kind-up: ##! Create KIND cluster, patch CoreDNS, create ns and required secrets (requires private/)
 	@[ -n "$(HOST_IP)" ] || (echo "HOST_IP not detected. Export HOST_IP=192.168.x.y and retry." && exit 1)
 	@[ -n "$(KIND_INGRESS_HOSTS)" ] || (echo "KIND_INGRESS_HOSTS must not be empty." && exit 1)
 	@[ -n "$$DOCKER_USER" ] || (echo "DOCKER_USER env var not set" && exit 1)
@@ -338,7 +340,7 @@ create-secrets:
 	kubectl -n $(NAMESPACE) delete secret opa-bearer --ignore-not-found=true
 	TOKEN="$$DOCKER_USER:$$DOCKER_PASSWORD"; kubectl -n $(NAMESPACE) create secret generic opa-bearer --from-literal=token="$$TOKEN"
 
-kind-down: ## Delete KIND cluster
+kind-down: ##! Delete KIND cluster
 	kind delete cluster --name zeta-local
 
 dry-run-security-restricted: ## Test PSS violations without modifying namespace.

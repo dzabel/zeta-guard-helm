@@ -2,6 +2,9 @@ dependencies:
 - name: testfachdienst
   repository: file://charts/testfachdienst
   version: 0.0.1
+- name: hsmsim
+  repository: file://charts/hsmsim
+  version: 0.0.1
 - name: popp-mocks
   repository: file://charts/popp-mocks
   version: 0.0.1
@@ -13,7 +16,7 @@ dependencies:
   version: 0.0.1
 - name: zeta-guard
   repository: file://charts/zeta-guard
-  version: 0.4.1
+  version: 0.5.3
 - name: testdriver
   repository: file://charts/test-driver
   version: 0.0.1
@@ -29,5 +32,5 @@ dependencies:
 - name: infinispan-external
   repository: file://charts/infinispan-external
   version: 0.0.1
-digest: sha256:0b53d9f683741cdf2ef0bcc03796d7dcb5fcc609e0defe7f96a0ea372a858291
-generated: "2026-03-24T19:23:05.740912+01:00"
+digest: sha256:28bc6c8dd8010d9fd0e17befd08ef5084df34c7537495ee33a1fc14c7ca6246f
+generated: "2026-04-09T15:19:45.163217+02:00"

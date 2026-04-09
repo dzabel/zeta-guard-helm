@@ -22,6 +22,8 @@ telemetry-gateway:
       otlp_grpc/test-monitoring-service:
         # endpoint: SERVICE.NAMESPACE.svc.cluster.local:4317
         endpoint: opentelemetry-collector.test-monitoring.svc.cluster.local:4317
+        tls:
+          insecure: true
 ```
 
 And finally, you need to set up a port-forward from your cluster to your

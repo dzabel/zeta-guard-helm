@@ -73,23 +73,48 @@ telemetry-gateway:
 
 ## Usage in OpenShift 4.x
 
-- Set `openshiftRoute` to true to enable [openshift-route.yaml](templates/openshift-route.yaml), e.g.
-```yaml
-openshiftRoute:
-    enabled: true
-    host: zeta-guard.apps-crc.testing
-    issuer:
-        issuerName: local-selfsigned
-        secretName: zeta-guard-tls
-```
-- Set `nginx-ingress` to `false`.
-- Set `testMonitoringServiceEnabled` to `false`.
-- Remove `runAsUser: 1000` from all securityContext blocks (`initContainerSecurityContext`,`containerSecurityContext`,`securityContext`). OpenShift will set this dynamically per namespace/project.
+To run ZETA-Guard on OpenShift 4.x, the following configuration changes are
+required:
 
-> Notes:
-> - The charts are tested with RedHats local OpenShift testplatform, CodeReady Containers (CRC) with standard pod security `restricted-v2`.  
-> - For productive use, more fine-grained adjustments may be required
-> - Monitoring/telemetry is not implemented for OpenShift deployments at this time. If monitoring is required (e.g., via OpenTelemetry, Prometheus, or Grafana), it must be set up separately.
+#### 1. Enable OpenShift Ingress with TLS
+
+Instead of using a dedicated OpenShift Route resource, a standard Kubernetes
+Ingress with TLS configuration is used.
+The OpenShift Ingress-to-Route Controller will automatically create
+edge-terminated Routes with TLS redirect.
+
+Set the following values:
+```yaml
+# Enable OpenShift Ingress-to-Route Controller with TLS
+openshiftIngress:
+  enabled: true
+  certName: zeta-guard-tls  # Name of the TLS secret used in the Ingress TLS blocks
+
+# Use the OpenShift-provided IngressClass
+ingressClassName: openshift-default
+
+# Disable NGINX Ingress Controller
+nginxIngressEnabled: false
+
+# Keep Ingress resources enabled
+ingressEnabled: true
+```
+
+The TLS secret (e.g. zeta-guard-tls) must exist in the target namespace and
+contain a valid certificate for the configured hostname.
+
+#### 2. Disable Test Monitoring
+
+Set `testMonitoringServiceEnabled` to `false`.
+This component is not compatible with OpenShift’s restricted-v2 Security Context
+Constraints (SCC).
+
+#### 3. Remove Fixed User IDs from Security Contexts
+
+Remove all occurrences of `runAsUser: 1000` from any securityContext
+definitions.
+OpenShift assigns user IDs dynamically per namespace/project, so fixed IDs will
+cause permission issues.
 
 ## License
 

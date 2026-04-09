@@ -40,6 +40,7 @@ spec:
     - {{ . | quote }}
     {{- end }}
 {{- end }}
+  isCA: true
   usages:
     - digital signature
     - key encipherment

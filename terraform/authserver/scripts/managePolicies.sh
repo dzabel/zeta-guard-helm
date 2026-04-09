@@ -1,126 +1,125 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+POLICY_NAME_ADD="𝛇-Guard user clients limit"
+REALM="zeta-guard"
+
 # input from terraform external data source
 input=$(cat)
-namespace=$(echo "$input" | jq -r '.namespace')
+keycloak_url=$(echo "$input" | jq -r '.keycloak_url')
+insecure_tls=$(echo "$input" | jq -r '.insecure_tls // "false"')
+username=$(echo "$input" | jq -r '.username // "admin"')
 password=$(echo "$input" | jq -r '.password // ""')
-policie_names_delete=$(echo "$input" | jq -r '.delete_policies | fromjson')
-policy_name_add=$(echo "$input" | jq -r '.policy_name_add')
+policy_names_delete=$(echo "$input" | jq -r '.delete_policies | fromjson')
 provider_id_add=$(echo "$input" | jq -r '.provider_id_add')
 
 results="{}"
 
-if [ -z "$password" ]; then
-  secret_name="authserver-admin"
-  secret_b64=$(kubectl -n "$namespace" get secret "$secret_name" -o jsonpath='{.data.password}' 2>/dev/null || true)
-
-  if [ -z "$secret_b64" ]; then
-    >&2 echo "Unable to read password from Keycloak secret '$secret_name' in namespace '$namespace'."
-    exit 1
-  fi
-
-  if ! password=$(printf '%s' "$secret_b64" | base64 --decode 2>/dev/null); then
-    >&2 echo "Failed to decode password from Keycloak secret '$secret_name'."
-    exit 1
-  fi
+# curl options
+CURL_OPTS=("-s" "-f" "--retry" "3" "--retry-delay" "2")
+if [ "$insecure_tls" = "true" ]; then
+  CURL_OPTS+=("-k")
 fi
 
-# Wait for keycloak container to be ready
-timeout=60
-interval=2
-elapsed=0
-while true; do
-  # determine the pod
-  POD=$(kubectl -n "$namespace" get pods \
-    -l app.kubernetes.io/name=authserver \
-    --field-selector=status.phase=Running \
-    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-  if [ -n "$POD" ]; then
-    status=$(kubectl -n "$namespace" get pod "$POD" -o jsonpath='{.status.containerStatuses[?(@.name=="keycloak")].ready}')
-    if [ "$status" = "true" ]; then
-      break
-    fi
-  fi
-  sleep $interval
-  elapsed=$((elapsed + interval))
-  if [ $elapsed -ge $timeout ]; then
-    >&2 echo "Timeout: Keycloak-Container in pod '$POD' is not ready."
-    kubectl -n "$namespace" describe pod "$POD"
+# check required tools
+for cmd in curl jq; do
+  if ! command -v "$cmd" &>/dev/null; then
+    >&2 echo "ERROR: '$cmd' is required but not found in PATH."
     exit 1
   fi
 done
 
-# set keycloak credentials
-kubectl -n "$namespace" exec "$POD" -- sh -c '
-  export HOME=/tmp
-  /opt/keycloak/bin/kcadm.sh config credentials \
-    --server http://localhost:8080/auth \
-    --realm master \
-    --user admin \
-    --password "'"$password"'" \
-'
+# get password
+if [ -z "$password" ]; then
+  if [ -n "${KEYCLOAK_PASSWORD:-}" ]; then
+    password="$KEYCLOAK_PASSWORD"
+  else
+    >&2 echo "No password provided! Set via tfvars, input, or KEYCLOAK_PASSWORD env."
+    exit 1
+  fi
+fi
 
-## delete policies ##
-# iterate over all policies and delete them if they exist
-policy_count_delete=$(echo "$policie_names_delete" | jq length)
+# authenticate against Keycloak and obtain access token
+TOKEN_RESPONSE=$(curl "${CURL_OPTS[@]}" \
+  -X POST \
+  -d "client_id=admin-cli" \
+  -d "username=$username" \
+  -d "password=$password" \
+  -d "grant_type=password" \
+  "$keycloak_url/realms/master/protocol/openid-connect/token" 2>&1) || {
+    >&2 echo "ERROR: Failed to authenticate against Keycloak at $keycloak_url"
+    >&2 echo "$TOKEN_RESPONSE"
+    exit 1
+  }
+
+ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+  >&2 echo "ERROR: Failed to obtain access token from Keycloak."
+  >&2 echo "$TOKEN_RESPONSE"
+  exit 1
+fi
+
+AUTH_HEADER="Authorization: Bearer $ACCESS_TOKEN"
+
+# helper: GET components by name
+get_component_by_name() {
+  local name="$1"
+  curl "${CURL_OPTS[@]}" \
+    -H "$AUTH_HEADER" \
+    "$keycloak_url/admin/realms/$REALM/components?name=$(jq -rn --arg n "$name" '$n|@uri')&type=org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy" \
+    2>/dev/null || echo '[]'
+}
+
+# delete policies
+policy_count_delete=$(echo "$policy_names_delete" | jq length)
 for (( i=0; i<policy_count_delete; i++ )); do
-  policy_name_delete=$(echo "$policie_names_delete" | jq -r ".[$i]")
-  set +e
-  # fetch policy by name
-  POLICY_JSON_DELETE=$(kubectl -n "$namespace" exec "$POD" -- sh -c '
-    export HOME=/tmp
-    /opt/keycloak/bin/kcadm.sh \
-      get components -r zeta-guard -F id,name -q name="'"$policy_name_delete"'"
-  ' 2>/dev/null)
-  STATUS=$?
-  set -e
+  policy_name_delete=$(echo "$policy_names_delete" | jq -r ".[$i]")
 
-  if [ $STATUS -ne 0 ] || [ -z "$POLICY_JSON_DELETE" ] || [ "$POLICY_JSON_DELETE" = "[]" ] || [ "$POLICY_JSON_DELETE" = "null" ]; then
+  POLICY_JSON_DELETE=$(get_component_by_name "$policy_name_delete")
+
+  if [ -z "$POLICY_JSON_DELETE" ] || [ "$POLICY_JSON_DELETE" = "[]" ] || [ "$POLICY_JSON_DELETE" = "null" ]; then
     result="No policy found, skipping."
   else
     POLICY_ID_DELETE=$(echo "$POLICY_JSON_DELETE" | jq -r '.[0].id')
     if [ -n "$POLICY_ID_DELETE" ] && [ "$POLICY_ID_DELETE" != "null" ]; then
-      kubectl -n "$namespace" exec "$POD" -- sh -c '
-        export HOME=/tmp
-        /opt/keycloak/bin/kcadm.sh \
-          delete components/"'"$POLICY_ID_DELETE"'" -r zeta-guard
-      '
+      curl "${CURL_OPTS[@]}" \
+        -X DELETE \
+        -H "$AUTH_HEADER" \
+        "$keycloak_url/admin/realms/$REALM/components/$POLICY_ID_DELETE" 2>/dev/null
       result="Policy deleted successfully."
     else
       result="No policy found, skipping."
     fi
   fi
-
   results=$(echo "$results" | jq --arg key "$policy_name_delete" --arg val "$result" '. + {($key): $val}')
 done
 
-## add policy
-# check existing policy
-set +e
-# fetch policy by name
-POLICY_JSON_ADD=$(kubectl -n "$namespace" exec "$POD" -- sh -c "
-  export HOME=/tmp
-  /opt/keycloak/bin/kcadm.sh get components -r zeta-guard -F id,name -q name=\"$policy_name_add\" || echo '[]'
-")
-POLICY_JSON_ADD=$(echo "$POLICY_JSON_ADD" | jq -c '.')
+# add policy
+POLICY_JSON_ADD=$(get_component_by_name "$POLICY_NAME_ADD")
 if [ "$(echo "$POLICY_JSON_ADD" | jq length)" -gt 0 ]; then
   result="Policy found, skipping."
 else
-  kubectl -n "$namespace" exec "$POD" -- sh -c '
-    export HOME=/tmp
-    /opt/keycloak/bin/kcadm.sh \
-      create components -r zeta-guard \
-      -s name="'"$policy_name_add"'" \
-      -s providerId="'"$provider_id_add"'" \
-      -s subType="anonymous" \
-      -s providerType="org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy"
-  '
+  CREATE_PAYLOAD=$(jq -n \
+    --arg name "$POLICY_NAME_ADD" \
+    --arg providerId "$provider_id_add" \
+    '{
+      name: $name,
+      providerId: $providerId,
+      providerType: "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy",
+      subType: "anonymous"
+    }')
+
+  curl "${CURL_OPTS[@]}" \
+    -X POST \
+    -H "$AUTH_HEADER" \
+    -H "Content-Type: application/json" \
+    -d "$CREATE_PAYLOAD" \
+    "$keycloak_url/admin/realms/$REALM/components" 2>/dev/null
   result="Policy created successfully."
 fi
 
-results=$(echo "$results" | jq --arg key "$policy_name_add" --arg val "$result" '. + {($key): $val}')
+results=$(echo "$results" | jq --arg key "$POLICY_NAME_ADD" --arg val "$result" '. + {($key): $val}')
 
-## return the results as json
+# return results
 jq -n --argjson flat "$results" '$flat'
 exit 0

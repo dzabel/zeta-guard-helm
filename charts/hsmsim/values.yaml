@@ -1,0 +1,19 @@
+global: {}
+
+enabled: true
+registry_name: ""
+image:
+  repository: hsm_sim
+  tag: 0.5.0
+imagePullPolicy: Always
+imagePullSecrets: [ ]
+podLabels: {}
+resources:
+  limits:
+    memory: "100Mi"
+  requests:
+    memory: "10Mi"
+persistent: false
+podAnnotations: {}
+affinity: {}
+tolerations: []

@@ -43,13 +43,6 @@ status:
 {{- $secretRef := $ctx.Values.opa.bundle.credentials.secretRef }}
 {{- $useSecret := (and (not $useWif) $secretRef $secretRef.name) }}
 
-{{- if $useSecret }}
-  {{- with (lookup "v1" "Secret" $ctx.Release.Namespace $secretRef.name) }}
-    {{- with .data }}
-      {{- with index . "token" }}{{- $token = b64dec . }}{{- end }}
-    {{- end }}
-  {{- end }}
-{{- end }}
 
 services:
   {{ required "opa.bundle.serviceName is required when bundle.enabled=true" $ctx.Values.opa.bundle.serviceName }}:
@@ -58,12 +51,10 @@ services:
     {{- end }}
     type: oci
     {{- if $useSecret }}
-      {{- if $token }}
     credentials:
       bearer:
         scheme: "Basic"
-        token: {{ $token | quote }}
-      {{- end }}
+        token: "${CREDENTIAL_TOKEN}"
     {{- else if $useWif }}
     credentials:
       bearer:
@@ -73,7 +64,6 @@ services:
         scheme: "Basic"
         token_path: "/var/run/secrets/gcp/token"
     {{- end }}
-
 bundles:
   authz:
     service: {{ $ctx.Values.opa.bundle.serviceName | quote }}
@@ -90,12 +80,11 @@ bundles:
       scope: {{ $verif.scope | quote }}
       {{- end }}
     {{- end }}
-{{- if and $verif.enabled $verif.keyId $verif.publicKey }}
+{{- if and $verif.enabled $verif.keyId }}
 keys:
   {{ $verif.keyId }}:
     algorithm: {{ default "ES256" $verif.algorithm }}
-    key: |
-{{ $verif.publicKey | nindent 6 }}
+    {{/* 'key' will be set via --set-file */}}
 {{- end }}
 
 {{- if $ctx.Values.opaPolicy.logDecisions }}
