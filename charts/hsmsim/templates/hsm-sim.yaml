@@ -1,0 +1,116 @@
+{{- /* vim: set ft=helm: */ -}}
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hsm-sim
+  labels:
+    {{- include "hsm-sim.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "hsm-sim.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hsm-sim.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets | default .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.resources }}
+      resources:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: hsm-sim
+          image: "{{ include "hsm-sim.image" . | trim }}"
+          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+          {{- if .Values.persistent }}
+          args: ["--listen", "0.0.0.0:50051", "--keys-dir", "/data/keys/"]
+          {{- else }}
+          args: ["--listen", "0.0.0.0:50051", "--keys-dir", "/etc/hsm_sim/keys/"]
+          {{- end }}
+          ports:
+            - containerPort: 50051
+              name: grpc
+          readinessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 1
+            periodSeconds: 1
+          livenessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 1
+            periodSeconds: 10
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.persistent }}
+          volumeMounts:
+            - name: keys
+              mountPath: /data/keys
+      initContainers:
+        - name: seed-ca
+          image: "{{ include "hsm-sim.image" . | trim }}"
+          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+          command: ["sh", "-c", "cp /etc/hsm_sim/keys/ca.* /data/keys/"]
+          volumeMounts:
+            - name: keys
+              mountPath: /data/keys
+      volumes:
+        - name: keys
+          persistentVolumeClaim:
+            claimName: hsm-sim-keys
+      {{- end }}
+
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+
+{{- if .Values.persistent }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hsm-sim-keys
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: hsm-sim
+  labels:
+    {{- include "hsm-sim.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "hsm-sim.selectorLabels" . | nindent 4 }}
+  ports:
+    - port: 50051
+      targetPort: grpc
+      name: grpc
+{{- end }}

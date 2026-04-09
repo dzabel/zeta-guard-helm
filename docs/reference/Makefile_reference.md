@@ -17,6 +17,8 @@
  - `make install-cnpg-operator [namespace=cnpg-system]` – install CloudNativePG operator (clusterWide=true) into the specified namespace (create it first if needed)
  - `make uninstall-cnpg-operator [namespace=cnpg-system]` – uninstall the CNPG operator release (keeps CRDs)
  - `make reset-cnpg-operator [namespace=cnpg-system]` – uninstall the operator and delete CNPG CRDs (destructive)
+- `make generate-main-and-backend` – generates `main.tf` and backend config from templates based on `TF_VAR_use_kubernetes`
+- `make config-init stage=STAGE [namespace=NAMESPACE]` – runs `generate-main-and-backend` and initializes the Terraform backend
 - `make config-plan stage=STAGE [namespace=NAMESPACE]` – view incoming changes to the authserver by make config
 - `make config stage=STAGE [namespace=NAMESPACE]` – configure the authserver
 - `make status stage=STAGE [namespace=NAMESPACE]` – show release status
@@ -30,6 +32,7 @@
 - The Makefile expects `SMB_KEYSTORE_PW_FILE` and `SMB_KEYSTORE_FILE_B64` to be set for most targets.
 - `VALUES_DIR` is selected automatically: `private/` when present, otherwise `local-test/`.
 - For `make config` and `make config-plan`, set `TF_VAR_keycloak_password` to the Keycloak admin password (used by Terraform).
+- `TF_VAR_use_kubernetes` controls the Terraform operating mode (default: `true`). Set to `false` for local mode without Kubernetes backend. See [How to configure authserver](../how-to_guides/How_to_configure_authserver.md) for details.
 - `KIND_INGRESS_HOSTS` is auto-derived from ingress-related host keys in `values.local.yaml` (`ingressRulesHost`, `hostname`, `zetaBaseUrl`, `wellKnownBase`, `requiredAudience`, `pepIssuer`). If auto-detection yields nothing, it falls back to `zeta-kind.local`.
 - CloudNativePG: install a single operator per cluster. If you previously installed the operator in another namespace and hit Helm ownership errors, remove the old release and CNPG CRDs before installing into the desired namespace.
 
@@ -38,5 +41,6 @@
 - `make deploy` (equivalent to `stage=local` and `namespace=zeta-local`)
 - `make deploy stage=my-env namespace=my-ns`
 - `make template stage=demo`  (renders with `values.demo.yaml`)
-- `make config stage=demo` (uses configured terraform variables)
+- `make config stage=demo` (uses configured terraform variables, K8s mode)
+- `make config stage=local TF_VAR_use_kubernetes=false` (local mode, no K8s backend)
 - `make kind-up KIND_INGRESS_HOSTS="zeta-kind.local zeta-client.local"`

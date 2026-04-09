@@ -2,13 +2,19 @@ apiVersion: v2
 name: zeta-testenv
 description: ZETA Guard test installation
 type: application
-version: 0.4.1
+version: 0.5.3
 dependencies:
   - name: testfachdienst
     version: 0.0.1
     repository: file://charts/testfachdienst
     tags:
       - testfachdienst
+  - name: hsmsim
+    version: 0.0.1
+    repository: file://charts/hsmsim
+    condition: hsmsim.enabled
+    tags:
+      - hsmsim
   - name: popp-mocks
     version: 0.0.1
     repository: file://charts/popp-mocks
@@ -26,7 +32,7 @@ dependencies:
     tags:
       - exauthsim
   - name: zeta-guard
-    version: 0.4.1
+    version: 0.5.3
     repository: file://charts/zeta-guard
     tags:
       - zeta-guard

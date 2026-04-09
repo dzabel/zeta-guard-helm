@@ -3,24 +3,158 @@
   "properties": {
     "authserver": {
       "type": "object",
+      "description": "Keycloak-based authorization server configuration.",
       "properties": {
         "replicaCount": {
           "type": "integer",
           "minimum": 1,
-          "description": "Number of authserver (Keycloak) replicas."
+          "description": "Number of authserver (Keycloak) replicas.",
+          "examples": [
+            2
+          ]
+        },
+        "truststoresSecretRef": {
+          "type": "string",
+          "description": "If you provide a secret with the truststore password yourself, you can reference it here via its name. It needs the field 'password'.",
+          "examples": [
+            "pdp-truststores-pw"
+          ]
+        },
+        "genesisHashSecretRef": {
+          "type": "string",
+          "description": "If you provide a secret with the genesis hash yourself, you can reference it here via its name. It needs the field 'hash'.",
+          "examples": [
+            "genesis-hash"
+          ]
+        },
+        "smcbHashingPepperSecretRef": {
+          "type": "string",
+          "description": "If you provide a secret with the smcb hashing pepper yourself, you can reference it here via its name. It needs the field 'pepper'.",
+          "examples": [
+            "genesis-hash"
+          ]
         },
         "admin": {
           "type": "object",
+          "description": "Initial Keycloak admin credentials.",
           "properties": {
+            "secretRef": {
+              "type": "string",
+              "description": "If you provide a secret with 'username' and 'password' fields for the initial keycloak admin account, you can use this by setting its name here.",
+              "examples": [
+                "authserver-admin"
+              ]
+            },
             "username": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Keycloak admin username.",
+              "examples": [
+                "admin"
+              ]
             },
             "password": {
               "type": [
                 "string",
                 "null"
+              ],
+              "description": "Keycloak admin password. Null when managed externally (e.g. via Secret)."
+            }
+          }
+        },
+        "config": {
+          "type": "object",
+          "description": "Keycloak application-level configuration.",
+          "properties": {
+            "maxClients": {
+              "type": "string",
+              "description": "Maximum number of clients per telematik-id.",
+              "examples": [
+                "256",
+                "5000"
               ]
+            },
+            "clientRegistrationTTL": {
+              "type": "string",
+              "description": "Time-to-live for dynamically registered clients in status pending. (This value is in ISO 8601 duration format).",
+              "examples": [
+                "PT5M"
+              ]
+            },
+            "clientRegistrationSchedulerInterval": {
+              "type": "string",
+              "description": "Interval for the scheduler that cleans up pending client registrations that have expired (This value is in ISO 8601 duration format).",
+              "examples": [
+                "PT2M"
+              ]
+            }
+          }
+        },
+        "container": {
+          "type": "object",
+          "properties": {
+            "containerSecurityContext": {
+              "$ref": "#/$defs/K8sContainerSecurityContext",
+              "description": "Kubernetes SecurityContext applied to the authserver container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+              "examples": [
+                {
+                  "runAsUser": 1000,
+                  "runAsGroup": 1000,
+                  "readOnlyRootFilesystem": true,
+                  "allowPrivilegeEscalation": false
+                }
+              ]
+            }
+          }
+        },
+        "initContainer": {
+          "type": "object",
+          "properties": {
+            "containerSecurityContext": {
+              "$ref": "#/$defs/K8sContainerSecurityContext",
+              "description": "Kubernetes SecurityContext applied to the authserver init container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+              "examples": [
+                {
+                  "runAsUser": 1000,
+                  "runAsGroup": 1000,
+                  "readOnlyRootFilesystem": false,
+                  "allowPrivilegeEscalation": false
+                }
+              ]
+            }
+          }
+        },
+        "provisioningProcessor": {
+          "type": "object",
+          "description": "Provisioning processor init container configuration for the authserver deployment.",
+          "properties": {
+            "image": {
+              "$ref": "#/$defs/ZetaImage",
+              "description": "Container image overrides for the provisioning processor in authserver deployments."
+            },
+            "imagePullPolicy": {
+              "type": "string",
+              "description": "Kubernetes image pull policy for the provisioning processor.",
+              "examples": [
+                "Always",
+                "IfNotPresent"
+              ]
+            },
+            "containerSecurityContext": {
+              "$ref": "#/$defs/K8sContainerSecurityContext",
+              "description": "Kubernetes SecurityContext applied to the provisioning processor init container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+              "examples": [
+                {
+                  "runAsUser": 1000,
+                  "runAsGroup": 1000,
+                  "readOnlyRootFilesystem": false,
+                  "allowPrivilegeEscalation": false
+                }
+              ]
+            },
+            "resources": {
+              "$ref": "#/$defs/K8sResourceRequirements",
+              "description": "CPU and memory resource requests/limits for the provisioning processor in authserver deployments."
             }
           }
         },
@@ -29,55 +163,149 @@
             "string",
             "null"
           ],
-          "description": "Initial hash for admin events log (required for first install)"
+          "description": "Initial hash for admin events log.",
+          "examples": [
+            "4841c2142fef441daa6ee6c57db65c011935964b14e94a6c8f5ec0447b83526c"
+          ]
+        },
+        "imagePullPolicy": {
+          "type": "string",
+          "description": "Kubernetes image pull policy for the authserver container.",
+          "examples": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "resources": {
+          "$ref": "#/$defs/K8sResourceRequirements",
+          "description": "CPU and memory resource requests/limits for the authserver container."
+        },
+        "log": {
+          "type": "object",
+          "description": "Keycloak logging configuration.",
+          "properties": {
+            "level": {
+              "type": "string",
+              "description": "Keycloak log level. Supports per-category overrides separated by comma.",
+              "examples": [
+                "INFO",
+                "DEBUG"
+              ]
+            }
+          }
         },
         "smcbHashingPepper": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Pepper value for SMCB hashing (required for first install)"
+          "description": "Pepper value for SMCB hashing.",
+          "examples": [
+            "67be1fc7-79e0-463e-b8f1-bb65a42f2510"
+          ]
         },
         "image": {
-          "$ref": "#/$defs/ZetaImage"
+          "$ref": "#/$defs/ZetaImage",
+          "description": "Container image overrides for the authserver."
+        },
+        "hsm": {
+          "type": "object",
+          "description": "HSM Proxy integration in Authserver.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Activate HSM key-loading at startup (sets HSM_PROXY_ENDPOINT / HSM_PROXY_KEY_ID)."
+            },
+            "endpoint": {
+              "type": "string",
+              "description": "gRPC address of the HSM Proxy, e.g. \"hsm-sim:50051\"."
+            },
+            "keyId": {
+              "type": "string",
+              "description": "Key identifier in the HSM, e.g. \"zeta-guard-keycloak-tls-es256-v1.p256\"."
+            },
+            "tls": {
+              "type": "object",
+              "description": "Pod-level HTTPS via HSM-backed key. Requires hsm.enabled: true.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable HTTPS on port 8443 using the HSM-backed HSMPROXY KeyStore."
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "description": "Pod-level HTTPS via a TLS cert/key from a Kubernetes Secret.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable HTTPS on port 8443 using KC_HTTPS_CERTIFICATE_FILE / KC_HTTPS_CERTIFICATE_KEY_FILE."
+            },
+            "certSecretName": {
+              "type": "string",
+              "description": "Name of a kubernetes.io/tls Secret containing tls.crt and tls.key."
+            }
+          }
         },
         "hostname": {
           "type": "string",
-          "description": "External hostname for the Keycloak authserver (passed as --hostname)."
+          "description": "External hostname for the Keycloak authserver (passed as --hostname).",
+          "examples": [
+            "zeta-kind.local",
+            "my.fachdienst.example.com"
+          ]
         },
         "dbPool": {
           "type": "object",
+          "description": "Keycloak database connection pool settings.",
           "properties": {
             "minSize": {
               "type": "integer",
               "minimum": 0,
-              "description": "Keycloak --db-pool-min-size: minimum number of idle DB connections."
+              "description": "Keycloak --db-pool-min-size: minimum number of idle DB connections.",
+              "examples": [
+                25
+              ]
             },
             "maxSize": {
               "type": "integer",
               "minimum": 1,
-              "description": "Keycloak --db-pool-max-size: maximum number of DB connections."
+              "description": "Keycloak --db-pool-max-size: maximum number of DB connections.",
+              "examples": [
+                150
+              ]
             }
           }
         },
         "httpPool": {
           "type": "object",
+          "description": "Keycloak HTTP thread pool settings.",
           "properties": {
             "maxThreads": {
               "type": "integer",
               "minimum": 1,
-              "description": "Keycloak --http-pool-max-threads: maximum number of Undertow worker threads."
+              "description": "Keycloak --http-pool-max-threads: maximum number of Undertow worker threads.",
+              "examples": [
+                200
+              ]
             }
           }
         },
         "imagePullSecrets": {
-          "$ref": "#/$defs/K8sImagePullSecrets"
+          "$ref": "#/$defs/K8sImagePullSecrets",
+          "description": "Image pull secrets for the authserver container."
         },
         "provider": {
           "type": "object",
+          "description": "ZETA SMC-B token-exchange provider configuration.",
           "properties": {
             "smcB": {
               "type": "object",
+              "description": "SMC-B identity provider settings including OPA integration.",
               "properties": {
                 "opa": {
                   "type": "object",
@@ -90,27 +318,42 @@
                 },
                 "opaBaseUrl": {
                   "type": "string",
-                  "description": "Base URL of the active OPA instance (e.g. http://opa:8181)."
+                  "description": "Base URL of the active OPA instance. Only for test setups. DO NOT USE IN PRODUCTION!",
+                  "examples": [
+                    "http://opa:8181"
+                  ]
                 },
                 "opaSimulationBaseUrl": {
                   "type": "string",
-                  "description": "Base URL of the OPA simulation instance. Set to empty string to disable shadow calls (e.g. http://opa-simulation:8181)."
+                  "description": "Base URL of the OPA simulation instance. Empty string disables shadow calls. Only for test setups. DO NOT USE IN PRODUCTION!",
+                  "examples": [
+                    "http://opa-simulation:8181"
+                  ]
                 },
                 "decisionPath": {
                   "type": "string",
-                  "description": "OPA decision endpoint path (e.g. /v1/data/policies/zeta/authz/decision)."
+                  "description": "OPA decision endpoint path. Only for test setups. DO NOT USE IN PRODUCTION!",
+                  "examples": [
+                    "/v1/data/policies/zeta/authz/decision"
+                  ]
                 },
                 "connectionTimeoutMs": {
                   "type": "integer",
-                  "description": "HTTP connection timeout in milliseconds for OPA requests."
+                  "description": "HTTP connection timeout in milliseconds for OPA requests.",
+                  "examples": [
+                    1000
+                  ]
                 },
                 "readTimeoutMs": {
                   "type": "integer",
-                  "description": "HTTP read timeout in milliseconds for OPA requests."
+                  "description": "HTTP read timeout in milliseconds for OPA requests.",
+                  "examples": [
+                    2000
+                  ]
                 },
                 "failClosed": {
                   "type": "boolean",
-                  "description": "When true, deny the token exchange if OPA is unreachable (503). When false, allow."
+                  "description": "When true, deny the token exchange if OPA is unreachable (503). When false, allow. HAS TO BE true IN PRODUCTION"
                 }
               }
             }
@@ -120,64 +363,106 @@
     },
     "authServerLogConsoleOutput": {
       "type": "string",
+      "description": "Keycloak console log format.",
       "enum": [
         "default",
         "json"
       ]
     },
     "authServerMetricsEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Enable the Prometheus metrics endpoint for Keycloak."
     },
     "authServerTracingEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Enable OpenTelemetry distributed tracing for Keycloak."
     },
     "gematik": {
       "type": "object",
+      "description": "Configuration for the gematik connection (OIDC token renewal via Workload Identity Federation).",
       "properties": {
         "clientId": {
-          "type": "string"
+          "type": "string",
+          "description": "OAuth2 client ID for the IAP-secured gematik resource.",
+          "examples": [
+            "myapp.apps.googleusercontent.com"
+          ]
         },
         "serviceAccountEmailAddress": {
-          "type": "string"
+          "type": "string",
+          "description": "Google service account email to impersonate via Workload Identity Federation.",
+          "examples": [
+            "sa@xyz.iam.gserviceaccount.com"
+          ]
         },
         "workloadIdentityFederation": {
           "type": "object",
+          "description": "Google Workload Identity Federation settings for the gematik OIDC token renewer.",
           "properties": {
             "projectNumber": {
-              "type": "string"
+              "type": "string",
+              "description": "GCP project number that contains the workload identity pool.",
+              "examples": [
+                "123456789101"
+              ]
             },
             "poolId": {
-              "type": "string"
+              "type": "string",
+              "description": "Workload identity pool ID.",
+              "examples": [
+                "pool-id"
+              ]
             },
             "workloadIdentityProvider": {
-              "type": "string"
+              "type": "string",
+              "description": "Workload identity pool provider ID.",
+              "examples": [
+                "pool-id"
+              ]
             }
           }
         }
       }
     },
     "gematikConnectionEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "When true, deploy the CronJob that maintains a valid gematik OIDC access token."
     },
     "global": {
       "type": "object",
+      "description": "Global values shared across all subcharts.",
       "properties": {
         "imagePullSecrets": {
-          "$ref": "#/$defs/K8sImagePullSecrets"
+          "$ref": "#/$defs/K8sImagePullSecrets",
+          "description": "Image pull secrets applied globally to all pods."
         },
         "registry_host": {
-          "type": "string"
+          "type": "string",
+          "description": "Container registry host prefix prepended to all image references.",
+          "examples": [
+            "europe-west3-docker.pkg.dev/gematik-pt-zeta-prod/zeta-dcr/",
+            "my.own.registry.mylocaldomain:443/"
+          ]
         }
       },
       "required": [
         "registry_host"
       ]
     },
+    "imageTrustCertchainSecretRef": {
+      "type": "string",
+      "description": "Secret name that has a field 'certchain.pem' with gematik's certchain for container image signatures (only CA and intermediate certs, no leaf cert).",
+      "examples": [
+        "gematik-image-signer"
+      ]
+    },
     "opaDistributedTracingEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Enable OPA distributed tracing via a gRPC OpenTelemetry endpoint."
     },
     "opaStatusPrometheus": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Export OPA status (bundle and plugin) metrics to Prometheus."
     },
     "databaseMode": {
       "type": "string",
@@ -185,19 +470,25 @@
         "external",
         "cloudnative"
       ],
-      "description": "Where the database credentials are sourced from. 'cloudnative' (CloudNativePG) or 'external' (supply authserverDb)."
+      "description": "Whether to use your own database (external) or CloudNativePG (cloudnative) as the authserver db."
     },
     "authserverDb": {
       "type": "object",
-      "description": "Relevant only for databaseMode=external . This is how you can configure your own DB.",
+      "description": "Relevant only for databaseMode=external. This is how you can configure your own DB.",
       "properties": {
         "kcDb": {
           "type": "string",
-          "description": "See environment variable KC_DB in keycloak config https://www.keycloak.org/server/db"
+          "description": "See environment variable KC_DB in keycloak config https://www.keycloak.org/server/db",
+          "examples": [
+            "postgres"
+          ]
         },
         "kcDbUrl": {
           "type": "string",
-          "description": "See environment variable KC_DB_URL in keycloak config https://www.keycloak.org/server/db"
+          "description": "See environment variable KC_DB_URL in keycloak config https://www.keycloak.org/server/db",
+          "examples": [
+            "jdbc:postgresql://db-host:5432/keycloak"
+          ]
         },
         "kcDbSecretName": {
           "type": "string",
@@ -205,32 +496,39 @@
         },
         "kcDbSchema": {
           "type": "string",
-          "description": "See environment variable KC_DB_SCHEMA in keycloak config https://www.keycloak.org/server/db"
+          "description": "See environment variable KC_DB_SCHEMA in keycloak config https://www.keycloak.org/server/db",
+          "examples": [
+            "public"
+          ]
         }
       }
     },
     "cloudnativePg": {
       "type": "object",
-      "description": "Relevant only for databaseMode=cloudnative. Configures the managed CloudNativePG cluster.",
+      "description": "Relevant only for databaseMode=cloudnative. Configures the managed CloudNativePG cluster. For details see https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/README.md",
       "properties": {
         "instances": {
           "type": "integer",
           "minimum": 1,
-          "description": "Number of PostgreSQL instances in the CloudNativePG cluster. Use 1 for development/test only. Production deployments require >= 3 to avoid a single point of failure."
+          "description": "See https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/README.md"
         },
         "imageName": {
           "type": "string",
-          "description": "Container image for the CloudNativePG PostgreSQL cluster."
+          "description": "See https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/README.md"
         },
         "resources": {
           "$ref": "#/$defs/K8sResourceRequirements"
         },
         "storage": {
           "type": "object",
+          "description": "See https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/README.md",
           "properties": {
             "size": {
               "type": "string",
-              "description": "Persistent volume size for the CloudNativePG cluster (for example: 10Gi)."
+              "description": "See https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/README.md",
+              "examples": [
+                "40Gi"
+              ]
             }
           }
         }
@@ -238,74 +536,152 @@
     },
     "pepproxy": {
       "type": "object",
+      "description": "Policy Enforcement Point (PEP) configuration.",
       "properties": {
         "replicaCount": {
           "type": "integer",
           "minimum": 1,
-          "description": "Number of PEP proxy (Nginx) replicas."
+          "description": "Number of PEP proxy replicas.",
+          "examples": [
+            2
+          ]
+        },
+        "containerSecurityContext": {
+          "$ref": "#/$defs/K8sContainerSecurityContext",
+          "description": "Kubernetes SecurityContext applied to the pep container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+          "examples": [
+            {
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "readOnlyRootFilesystem": false,
+              "allowPrivilegeEscalation": false
+            }
+          ]
+        },
+        "wellKnownBase": {
+          "type": "string",
+          "description": "Base URL used to construct .well-known endpoints for token validation. This is your public url.",
+          "examples": [
+            "https://zeta-kind.local"
+          ]
         },
         "asl_enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable ASL in the PEP proxy."
         },
         "aslRootCA": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Root CA name for ASL certificate chain validation.",
+          "examples": [
+            "GEM.RCA7 TEST-ONLY"
+          ]
         },
-        "aslOcspUrl": {
+        "aslOcsp": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Enable or disable OCSP Stapling for ASL. Alternatively provide a OCSP responder URL to enable OCSP stapling whilst overriding the OCSP responder URLs from the certificates.",
+          "examples": [
+            "http://example.org/ocsp",
+            "on",
+            "off"
+          ]
+        },
+        "aslOcspTtl": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Maximum validity duration of cached OCSP responses (default 24h per A_24624-01).",
+          "examples": [
+            "5m",
+            "24h"
+          ]
         },
         "image": {
-          "$ref": "#/$defs/ZetaImage"
+          "$ref": "#/$defs/ZetaImage",
+          "description": "Container image overrides for the PEP proxy."
         },
         "imagePullSecrets": {
-          "$ref": "#/$defs/K8sImagePullSecrets"
+          "$ref": "#/$defs/K8sImagePullSecrets",
+          "description": "Image pull secrets for the pepproxy container."
         },
         "nginxConf": {
           "type": "object",
+          "description": "nginx configuration for the PEP proxy.",
           "properties": {
+            "noTravel": {
+              "type": "boolean",
+              "description": "Enable or disable no-travel enforcement in the PEP proxy. THIS MUST BE ENABLED IN PRODUCTION."
+            },
             "configMapName": {
-              "type": "string"
+              "type": "string",
+              "description": "Name of the ConfigMap holding the Nginx configuration.",
+              "examples": [
+                "pep-nginx-conf"
+              ]
             },
             "fachdienstUrl": {
-              "type": "string"
-            },
-            "fileContent": {
-              "type": "string"
+              "type": "string",
+              "description": "You COULD use this in your `pepproxy.locations` block.",
+              "examples": [
+                "https://fachdienst.example.com"
+              ]
             },
             "generateConfigMap": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "When true, the chart generates the nginx ConfigMap from values. When false, use an existing ConfigMap. WARNING: Use with caution since this silently conflicts with basically most of PEP's configuration."
             },
             "httpClientAcceptInvalidCerts": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "When true, the PEP proxy accepts invalid upstream TLS certificates. DO NOT SET TO true IN PRODUCTION."
             },
             "aslTestmode": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable ASL test mode. Disables encryption. DO NOT SET TO true IN PRODUCTION."
             },
             "locations": {
-              "type": "string"
+              "type": "string",
+              "description": "Additional Nginx location blocks injected into the generated config. Here you should configure connection to your Fachdienst."
             },
             "pepIssuer": {
-              "type": "string"
+              "type": "string",
+              "description": "OIDC issuer (iss) of the authorization server used for access token validation. This is used for token validation as well as for retvrieving the JWKS and similar things.",
+              "examples": [
+                "https://zeta-kind.local/auth/realms/zeta-guard"
+              ]
             },
             "poppIssuer": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "description": "JWKS issuer URL for PoPP key validation.",
+                  "examples": [
+                    "https://popp.example.com"
+                  ]
+                }
+              ]
             },
             "requiredAudience": {
-              "type": "string"
+              "type": "string",
+              "description": "Required audience (aud) claim in access tokens. This should be your public Fachdienst URL.",
+              "examples": [
+                "https://zeta-kind.local"
+              ]
             },
             "requiredScopes": {
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "Scopes required for a valid access token. This should be defined in your Fachdienst Spec."
             }
           },
           "required": [
             "configMapName",
             "generateConfigMap",
-            "pepIssuer",
-            "poppIssuer"
+            "pepIssuer"
           ],
           "allOf": [
             {
@@ -338,10 +714,65 @@
           ]
         },
         "resources": {
-          "$ref": "#/$defs/K8sResourceRequirements"
+          "$ref": "#/$defs/K8sResourceRequirements",
+          "description": "CPU and memory resource requests/limits for the pepproxy container."
+        }
+      },
+      "required": [
+        "nginxConf"
+      ]
+    },
+    "provisioningProcessor": {
+      "type": "object",
+      "description": "Provisioning processor sidecar that handles trust anchor provisioning.",
+      "properties": {
+        "containerSecurityContext": {
+          "$ref": "#/$defs/K8sContainerSecurityContext",
+          "description": "Kubernetes SecurityContext applied to the provisioningProcessor container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+          "examples": [
+            {
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "readOnlyRootFilesystem": false,
+              "allowPrivilegeEscalation": false
+            }
+          ]
         },
+        "image": {
+          "$ref": "#/$defs/ZetaImage",
+          "description": "Container image overrides for the provisioning processor."
+        },
+        "imagePullPolicy": {
+          "type": "string",
+          "description": "Kubernetes image pull policy for the provisioning processor.",
+          "examples": [
+            "Always",
+            "IfNotPresent"
+          ]
+        },
+        "resources": {
+          "$ref": "#/$defs/K8sResourceRequirements",
+          "description": "CPU and memory resource requests/limits for the provisioning processor."
+        }
+      }
+    },
+    "hsmsim": {
+      "type": "object",
+      "description": "HSM simulator used for local/test cryptographic operations. DO NOT USE IN PRODUCTION!",
+      "properties": {
+        "resources": {
+          "$ref": "#/$defs/K8sResourceRequirements",
+          "description": "CPU and memory resource requests/limits for the HSM simulator."
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "description": "Ingress controller settings for the zeta-guard services.",
+      "properties": {
         "sessionAffinity": {
           "type": "object",
+          "description": "Session affinity (sticky sessions) configuration.",
           "properties": {
             "enabled": {
               "type": "boolean",
@@ -352,80 +783,126 @@
             "enabled"
           ]
         }
-      },
-      "required": [
-        "nginxConf"
-      ]
+      }
     },
     "pepproxyMetricsEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Enable the Prometheus metrics exporter sidecar for the PEP proxy."
     },
     "pepproxyTracingEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Enable OpenTelemetry distributed tracing for the PEP proxy."
     },
     "telemetry-gateway": {
-      "type": "object"
+      "type": "object",
+      "description": "OpenTelemetry Collector deployment that aggregates and exports telemetry data. Configured via the opentelemetry-collector subchart."
     },
     "telemetryGatewayEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Include the telemetry gateway in the Helm release. SHOULD BE true FOR PRODUCTION."
     },
     "opa": {
       "type": "object",
+      "description": "Open Policy Agent (OPA) configuration for authorization policy evaluation.",
       "properties": {
         "bundle": {
           "type": "object",
+          "description": "OPA bundle mode configuration for loading policies from a remote registry.",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable OPA bundle mode. When false, inline policyRego is used."
             },
             "serviceName": {
-              "type": "string"
+              "type": "string",
+              "description": "Logical service name used in OPA config to identify the bundle source.",
+              "examples": [
+                "gitlab",
+                "gar",
+                "gematik-pt-zeta-test"
+              ]
             },
             "url": {
-              "type": "string"
+              "type": "string",
+              "description": "Base URL of the OCI/Docker registry serving bundles.",
+              "examples": [
+                "https://europe-west3-docker.pkg.dev"
+              ]
             },
             "resource": {
-              "type": "string"
+              "type": "string",
+              "description": "Fully qualified bundle resource path including registry host.",
+              "examples": [
+                "europe-west3-docker.pkg.dev/gematik-pt-zeta-test/zeta-policies/test-fachdienst-policies:latest"
+              ]
             },
             "polling": {
               "type": "object",
+              "description": "Bundle polling interval configuration.",
               "properties": {
                 "min_delay_seconds": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Minimum polling delay in seconds between bundle download attempts.",
+                  "examples": [
+                    60
+                  ]
                 },
                 "max_delay_seconds": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Maximum polling delay in seconds between bundle download attempts.",
+                  "examples": [
+                    60
+                  ]
                 }
               }
             },
             "verification": {
               "type": "object",
+              "description": "Bundle signature verification settings.",
               "properties": {
                 "enabled": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "Enable cryptographic signature verification for downloaded bundles. THIS SHOULD BE true IN PRODUCTION!"
                 },
                 "keyId": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Key ID that must match the signing key embedded in the bundle. You can usually leave this alone and rely on the default.",
+                  "examples": [
+                    "signer",
+                    "zeta_artifact_reg_nist"
+                  ]
                 },
                 "algorithm": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Signature algorithm used to verify the bundle. You can usually leave this alone and rely on the default.",
+                  "examples": [
+                    "ES256"
+                  ]
                 },
                 "publicKey": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "PEM-encoded public key for bundle signature verification. DO NOT TOUCH FOR PRODUCTION!"
                 },
                 "scope": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Must match the scope embedded in the bundle signature. Omit if the bundle was signed without a scope."
                 }
               }
             },
             "credentials": {
               "type": "object",
+              "description": "Registry credentials for bundle downloads.",
               "properties": {
                 "secretRef": {
                   "type": "object",
+                  "description": "Reference to a Kubernetes Secret holding registry bearer credentials.",
                   "properties": {
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Name of the Secret in the release namespace. Empty string disables credential injection (e.g. in WIF mode).",
+                      "examples": [
+                        "opa-bearer"
+                      ]
                     }
                   }
                 }
@@ -433,10 +910,65 @@
             }
           }
         },
+        "provisioningProcessor": {
+          "type": "object",
+          "properties": {
+            "containerSecurityContext": {
+              "$ref": "#/$defs/K8sContainerSecurityContext",
+              "description": "Kubernetes SecurityContext applied to the trust-anchor provisioning processor init container in OPA deployments. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+              "examples": [
+                {
+                  "runAsUser": 1000,
+                  "runAsGroup": 1000,
+                  "readOnlyRootFilesystem": false,
+                  "allowPrivilegeEscalation": false
+                }
+              ]
+            },
+            "resources": {
+              "$ref": "#/$defs/K8sResourceRequirements",
+              "description": "CPU and memory resource requests/limits for the provisioning processor in OPA deployments."
+            }
+          }
+        },
+        "containerSecurityContext": {
+          "$ref": "#/$defs/K8sContainerSecurityContext",
+          "description": "Kubernetes SecurityContext applied to the opa container. See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+          "examples": [
+            {
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "readOnlyRootFilesystem": false,
+              "allowPrivilegeEscalation": false
+            }
+          ]
+        },
+        "cronjobSecurityContext": {
+          "$ref": "#/$defs/K8sContainerSecurityContext",
+          "description": "Kubernetes SecurityContext applied to the OPA-related CronJob containers (e.g. token renewer). See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+          "examples": [
+            {
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "readOnlyRootFilesystem": false,
+              "allowPrivilegeEscalation": false
+            }
+          ]
+        },
+        "serviceAccountName": {
+          "type": "string",
+          "description": "Kubernetes ServiceAccount name for OPA pods. Required for Workload Identity Federation.",
+          "examples": [
+            "opa"
+          ]
+        },
         "replicaCount": {
           "type": "integer",
           "minimum": 1,
-          "description": "Number of OPA replicas."
+          "description": "Number of OPA replicas.",
+          "examples": [
+            2
+          ]
         },
         "logLevel": {
           "type": "string",
@@ -449,9 +981,15 @@
           "description": "OPA server log level."
         },
         "image": {
-          "type": "string"
+          "type": "string",
+          "description": "Full OPA container image reference.",
+          "examples": [
+            "openpolicyagent/opa:1.14.1-static",
+            "docker.io/openpolicyagent/opa:1.11.0-static"
+          ]
         },
         "imagePullPolicy": {
+          "description": "Kubernetes image pull policy for the OPA container.",
           "enum": [
             "Always",
             "IfNotPresent",
@@ -459,34 +997,128 @@
           ]
         },
         "imagePullSecrets": {
-          "$ref": "#/$defs/K8sImagePullSecrets"
+          "$ref": "#/$defs/K8sImagePullSecrets",
+          "description": "Image pull secrets for the OPA container."
         },
         "resources": {
-          "$ref": "#/$defs/K8sResourceRequirements"
+          "$ref": "#/$defs/K8sResourceRequirements",
+          "description": "CPU and memory resource requests/limits for the OPA container."
         },
         "workloadIdentityFederation": {
           "type": "object",
+          "description": "Workload Identity Federation for accessing Google Artifact Registry without static credentials.",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable Workload Identity Federation for OPA bundle downloads from GAR."
+            },
+            "sts": {
+              "type": "object",
+              "description": "Google Security Token Service (STS) configuration.",
+              "properties": {
+                "audience": {
+                  "type": "string",
+                  "description": "STS audience (the WIF provider resource name).",
+                  "examples": [
+                    "//iam.googleapis.com/projects/<PROJECT_NUM>/locations/global/workloadIdentityPools/<POOL_ID>/providers/<PROVIDER_ID>"
+                  ]
+                },
+                "iamUrl": {
+                  "type": "string",
+                  "description": "Google IAM credentials API endpoint.",
+                  "examples": [
+                    "https://iamcredentials.googleapis.com"
+                  ]
+                },
+                "sa": {
+                  "type": "string",
+                  "description": "Google service account email to impersonate.",
+                  "examples": [
+                    "sa@xyz.iam.gserviceaccount.com"
+                  ]
+                },
+                "scope": {
+                  "type": "string",
+                  "description": "OAuth2 scope requested from STS.",
+                  "examples": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "tokenUrl": {
+                  "type": "string",
+                  "description": "Google STS token exchange endpoint.",
+                  "examples": [
+                    "https://sts.googleapis.com/v1/token"
+                  ]
+                }
+              }
+            },
+            "gar": {
+              "type": "object",
+              "description": "Google Artifact Registry configuration.",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "description": "GAR registry host.",
+                  "examples": [
+                    "europe-west3-docker.pkg.dev"
+                  ]
+                }
+              }
+            },
+            "tokenRenewer": {
+              "type": "object",
+              "description": "CronJob that periodically refreshes the WIF access token.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable the token renewer CronJob."
+                },
+                "schedule": {
+                  "type": "string",
+                  "description": "Cron schedule expression for token renewal.",
+                  "examples": [
+                    "*/45 * * * *",
+                    "*/5 * * * *"
+                  ]
+                },
+                "backoffLimit": {
+                  "type": "integer",
+                  "description": "Number of retries for failed token renewal Jobs.",
+                  "examples": [
+                    5
+                  ]
+                }
+              }
             }
           }
         },
         "simulation": {
           "type": "object",
+          "description": "OPA simulation instance for shadow policy evaluation.",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Deploy a second OPA instance that evaluates policies in shadow mode."
             },
             "replicaCount": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Number of OPA simulation replicas.",
+              "examples": [
+                2
+              ]
             },
             "bundle": {
               "type": "object",
+              "description": "Bundle configuration specific to the simulation OPA instance.",
               "properties": {
                 "resource": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Bundle resource path for the simulation instance.",
+                  "examples": [
+                    "europe-west3-docker.pkg.dev/gematik-pt-zeta-test/zeta-policies-test/test-fachdienst-policy:latest"
+                  ]
                 }
               }
             }
@@ -572,74 +1204,153 @@
     },
     "ingressMasterAnnotations": {
       "type": "object",
+      "description": "Extra annotations added to the master Ingress resource.",
       "additionalProperties": {
         "type": "string"
       }
     },
     "ingressMinionAnnotations": {
       "type": "object",
+      "description": "Extra annotations added to minion (path-based) Ingress resources.",
       "additionalProperties": {
         "type": "string"
       }
     },
     "routeViaTigerProxy": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "When true, the Ingress routes traffic through the tiger-proxy service instead of directly exposing internal services. DO NOT USE IN PRODUCTION"
     },
     "ingressClassName": {
-      "type": "string"
+      "type": "string",
+      "description": "IngressClass used by generated Ingress resources. Must match the NIC class name if the bundled NIC is enabled.",
+      "examples": [
+        "nginx",
+        "nginx-namespace1",
+        "nginx-namespace2"
+      ]
     },
     "clusterIssuer": {
-      "type": "string"
+      "type": "string",
+      "description": "cert-manager ClusterIssuer name used for TLS certificates on Ingress resources.",
+      "examples": [
+        "letsencrypt"
+      ]
+    },
+    "openshiftIngress": {
+      "type": "object",
+      "description": "OpenShift Ingress Route-Controller with TLS. Creates edge-terminated routes with TLS redirect via OpenShift's Ingress-to-Route controller. nginxIngressEnabled should be false",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "When true, add TLS configuration to Ingress resources for OpenShift's route controller."
+        },
+        "certName": {
+          "type": "string",
+          "description": "Name of the TLS Secret referenced in Ingress TLS blocks.",
+          "examples": [
+            "zeta-guard-tls"
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
     },
     "nginxIngressEnabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "When true, deploy the bundled NGINX Ingress Controller and add specific annotations for this ingress controller."
     },
     "nginx-ingress": {
       "type": "object",
+      "description": "Configuration passed to the bundled nginx-ingress subchart.",
       "properties": {
         "controller": {
           "type": "object",
+          "description": "NGINX Ingress Controller settings.",
           "properties": {
             "ingressClass": {
               "type": "object",
+              "description": "IngressClass resource configuration.",
               "properties": {
                 "name": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Name of the IngressClass resource to be monitored by the ingress controller. Relevant for namespace isolation.",
+                  "examples": [
+                    "nginx",
+                    "nginx-namespace1",
+                    "nginx-namespace2"
+                  ]
                 }
               }
             },
             "config": {
               "type": "object",
+              "description": "NGINX global configuration entries.",
               "properties": {
                 "entries": {
                   "type": "object",
+                  "description": "Key-value map of NGINX configuration directives.",
                   "properties": {
                     "ssl-protocols": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Allowed TLS protocol versions.",
+                      "examples": [
+                        "TLSv1.2 TLSv1.3"
+                      ]
                     },
                     "ssl-ciphers": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Allowed TLS cipher suites.",
+                      "examples": [
+                        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"
+                      ]
                     },
                     "ssl-ciphersuites": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "TLS 1.3 cipher suites."
                     },
                     "ssl-ecdh-curve": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Allowed ECDH curves for TLS key exchange.",
+                      "examples": [
+                        "prime256v1:secp384r1:brainpoolP256r1:brainpoolP384r1"
+                      ]
                     },
                     "ssl-session-cache": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "TLS session cache mode.",
+                      "examples": [
+                        "none"
+                      ]
                     },
                     "ssl-session-tickets": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Enable or disable TLS session tickets.",
+                      "examples": [
+                        "on",
+                        "off"
+                      ]
                     },
                     "ssl-session-timeout": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "TLS session timeout.",
+                      "examples": [
+                        "5m"
+                      ]
                     },
                     "ssl-stapling": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Enable or disable OCSP stapling.",
+                      "examples": [
+                        "off"
+                      ]
                     },
                     "ssl-prefer-server-ciphers": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Prefer server cipher order over client preference.",
+                      "examples": [
+                        "false"
+                      ]
                     }
                   },
                   "additionalProperties": true
@@ -648,22 +1359,36 @@
               "additionalProperties": true
             },
             "enableCustomResources": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Install ingress controller's custom resource definitions (VirtualServer, etc.). Disable if only using standard Ingress. Not required for ZETA."
             },
             "service": {
               "type": "object",
+              "description": "Kubernetes Service configuration for the ingress controller.",
               "properties": {
                 "type": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Service type for the ingress controller.",
+                  "examples": [
+                    "LoadBalancer",
+                    "NodePort"
+                  ]
                 },
                 "externalTrafficPolicy": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "External traffic policy for the ingress controller Service.",
+                  "examples": [
+                    "Cluster",
+                    "Local"
+                  ]
                 },
                 "httpPort": {
-                  "type": "object"
+                  "type": "object",
+                  "description": "HTTP port configuration (port, nodePort, targetPort)."
                 },
                 "httpsPort": {
-                  "type": "object"
+                  "type": "object",
+                  "description": "HTTPS port configuration (port, nodePort, targetPort)."
                 }
               },
               "additionalProperties": true
@@ -675,10 +1400,15 @@
       "additionalProperties": true
     },
     "devMode": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "When true, inject a changing annotation on each helm upgrade to force pod rollouts even if the image tag is unchanged. May/will lead to unneccesary restarts."
     },
     "registry_name": {
-      "type": "string"
+      "type": "string",
+      "description": "Registry path segment appended after global.registry_host for zeta-guard images.",
+      "examples": [
+        "zeta/zeta-guard/"
+      ]
     }
   },
   "required": [
@@ -699,25 +1429,42 @@
   "$defs": {
     "ZetaImage": {
       "type": "object",
+      "description": "Container image reference with optional registry override and digest pinning.",
       "properties": {
         "digest": {
           "type": "string",
-          "pattern": "^[a-z0-9+._-]+:[a-zA-Z0-9=_-]+$"
+          "description": "Image digest for pinning (e.g. sha256:abc...)."
         },
         "registry": {
-          "type": "string"
+          "type": "string",
+          "description": "Registry override for this specific image.",
+          "examples": [
+            "docker.io/",
+            "my.registry.example.com:443/"
+          ]
         },
         "repository": {
-          "type": "string"
+          "type": "string",
+          "description": "Image repository name.",
+          "examples": [
+            "keycloak-zeta",
+            "ngx_pep"
+          ]
         },
         "tag": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$"
+          "description": "Image tag.",
+          "examples": [
+            "0.4.1",
+            "main",
+            "latest"
+          ]
         }
       }
     },
     "K8sImagePullSecrets": {
       "type": "array",
+      "description": "List of Kubernetes image pull secret references.",
       "items": {
         "$ref": "#/$defs/K8sLocalObjectReference"
       }
@@ -728,7 +1475,8 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Name of the referenced Kubernetes resource."
         }
       },
       "required": [
@@ -738,21 +1486,28 @@
     "K8sResourceRequirements": {
       "$comment": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources",
       "type": "object",
-      "description": "Compute Resources required by this container. ",
+      "description": "Compute resources required by this container.",
       "properties": {
         "limits": {
           "type": "object",
+          "description": "Maximum compute resources the container may consume.",
           "additionalProperties": {
             "type": "string"
           }
         },
         "requests": {
           "type": "object",
+          "description": "Minimum compute resources guaranteed to the container.",
           "additionalProperties": {
             "type": "string"
           }
         }
       }
+    },
+    "K8sContainerSecurityContext": {
+      "$comment": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context",
+      "type": "object",
+      "description": "Security Context for a container"
     }
   }
 }

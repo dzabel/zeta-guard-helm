@@ -2,25 +2,38 @@ authserver:
   config:
     maxClients: "256"
   hostname: ""
-  initContainerSecurityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
-    runAsNonRoot: true
-    runAsUser: 1000
-    capabilities:
-      drop: [ "ALL" ]
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 1000
-    capabilities:
-      drop: [ "ALL" ]
+  provisioningProcessor:
+    image:
+      tag: 0.5.0
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
+  initContainer:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
+  container:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
+
+imageTrustCertchainSecretRef: gematik-image-signer-test
+
+ingress:
+  sessionAffinity:
+    enabled: false
 
 pepproxy:
-  replicaCount: 2
-  sessionAffinity:
-    enabled: true
+  replicaCount: 1
   containerSecurityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
@@ -38,20 +51,6 @@ pepproxy:
     requiredAudience: "test"
     requiredScopes: [ ]
 
-    locations: |-
-      location / {
-        root /usr/share/nginx/html;
-        pep on;
-        pep_require_popp off;
-      }
-      # Proxy OAuth Authorization Server metadata to Keycloak (demo)
-      # Served as: http://<host>/.well-known/oauth-authorization-server
-      # Target:   http://authserver/auth/realms/zeta-guard/.well-known/zeta-guard-well-known
-      location = /.well-known/oauth-authorization-server {
-        proxy_pass http://authserver/auth/realms/zeta-guard/.well-known/zeta-guard-well-known;
-        proxy_http_version 1.1;
-      }
-
 # DB mode switch:
 # - cloudnative: using CloudNativePG operator
 # - external: use external db by providing values in authserverDb.*
@@ -66,6 +65,16 @@ opa:
   bundle:
     # use Workload Identity Federation or secretRef when enabling bundle mode
     enabled: false
+  provisioningProcessor:
+    image:
+      tag: 0.5.0
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      runAsUser: 1000
+      capabilities:
+        drop: [ "ALL" ]
   containerSecurityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true

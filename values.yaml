@@ -88,6 +88,8 @@ zetaTlsTestToolServiceEnabled: false
 
 zeta-tls-test-tool-service: { }
 
+hsmsim:
+  enabled: false
 
 # Safe defaults for cert-manager issuers to avoid nil pointer lookups
 issuers:
@@ -119,15 +121,84 @@ testMonitoringService:
     grafana:
       rbac:
         namespaced: true
+    jaeger:
+      jaeger:
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+        livenessProbe:
+          failureThreshold: 6
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 6
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          failureThreshold: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+    opentelemetry-collector:
+      resources:
+        requests:
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      config:
+        exporters:
+          otlp:
+            sending_queue:
+              queue_size: 100
+          otlphttp/prometheus:
+            endpoint: http://prometheus:9090/prometheus/api/v1/otlp
+        service:
+          pipelines:
+            traces:
+              exporters:
+                - otlp
+                - spanmetrics
+            metrics:
+              exporters:
+                - otlphttp/prometheus
+            logs:
+              exporters:
+                - opensearch
+    prometheus:
+      server:
+        prefixURL: "/prometheus"
+        # Environments should override baseURL with their public host.
+        extraFlags:
+          - web.enable-otlp-receiver
+        resources:
+          requests:
+            # should be 1.5x of Prometheus' `storage.local.target-heap-size` (default 2GiB)
+            memory: 3Gi
+          limits:
+            memory: 6Gi
 
 zeta-guard:
   authserver:
     image:
       tag: main
+    resources:
+      limits:
+        cpu: "4"
+        memory: "4Gi"
+      requests:
+        cpu: "2"
+        memory: "4Gi"
   authServerLogConsoleOutput: default
   authServerMetricsEnabled: true
   authServerTracingEnabled: true
   gematikConnectionEnabled: false
+  imageTrustCertchainSecretRef: gematik-image-signer-test
   opaDistributedTracingEnabled: true
   opaStatusPrometheus: false
   openshiftRoute:
@@ -152,76 +223,44 @@ zeta-guard:
       # poppIssuer: http://popp-statics
 
       locations: |-
+        {{- $fd := .Values.pepproxy.nginxConf.fachdienstUrl -}}
         location / {
-          proxy_pass          {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/;
-          proxy_ssl_verify    off;
-        }
-        location /achelos_testfachdienst/ws/ {
-          proxy_pass            {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/achelos_testfachdienst/ws/;
-          proxy_http_version    1.1;
-          proxy_set_header      Upgrade $http_upgrade;
-          proxy_set_header      Connection $connection_upgrade;
-          proxy_set_header      Sec-WebSocket-Protocol $http_sec_websocket_protocol;
-        }
-        location /achelos_testfachdienst/ws {
-          proxy_pass            {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/achelos_testfachdienst/ws;
-          proxy_http_version    1.1;
-          proxy_set_header      Upgrade $http_upgrade;
-          proxy_set_header      Connection $connection_upgrade;
-          proxy_set_header      Sec-WebSocket-Protocol $http_sec_websocket_protocol;
+            pep off;
+            proxy_pass {{ $fd }}/;
+            proxy_ssl_verify off;
+
+            location /achelos_testfachdienst/ws {
+                proxy_pass {{ $fd }}/achelos_testfachdienst/ws;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Sec-WebSocket-Protocol $http_sec_websocket_protocol;
+
+                location /achelos_testfachdienst/ws/ {
+                    proxy_pass {{ $fd }}/achelos_testfachdienst/ws/;
+                }
+            }
         }
         location /pep/ {
-          proxy_pass            {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/;
-          proxy_ssl_verify      off;
-          pep                   on;
-          pep_require_aud       {{ .Values.pepproxy.nginxConf.requiredAudience }};
-          # pep_require_scope     "{{ join " " .Values.pepproxy.nginxConf.requiredScopes }}";
-          # pep_leeway           60; # s
-          pep_require_popp      on;
+            proxy_pass {{ $fd }}/;
+            proxy_ssl_verify off;
+
+            {{- if .Values.openshiftIngress.enabled }}
+            proxy_set_header Cookie ""; # do not pass OpenShift-session-cookies
+            {{- end }}
+
+            location /pep/achelos_testfachdienst/ws {
+                proxy_pass {{ $fd }}/achelos_testfachdienst/ws;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Sec-WebSocket-Protocol $http_sec_websocket_protocol;
+
+                location /pep/achelos_testfachdienst/ws/ {
+                    proxy_pass {{ $fd }}/achelos_testfachdienst/ws/;
+                }
+            }
         }
-        location /pep/achelos_testfachdienst/ws/ {
-          proxy_pass            {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/achelos_testfachdienst/ws/;
-          proxy_http_version    1.1;
-          proxy_set_header      Upgrade $http_upgrade;
-          proxy_set_header      Connection $connection_upgrade;
-          proxy_set_header      Sec-WebSocket-Protocol $http_sec_websocket_protocol;
-          pep                   on;
-          pep_require_popp      on;
-        }
-        location /pep/achelos_testfachdienst/ws {
-          proxy_pass            {{ .Values.pepproxy.nginxConf.fachdienstUrl }}/achelos_testfachdienst/ws;
-          proxy_http_version    1.1;
-          proxy_set_header      Upgrade $http_upgrade;
-          proxy_set_header      Connection $connection_upgrade;
-          proxy_set_header      Sec-WebSocket-Protocol $http_sec_websocket_protocol;
-          pep                   on;
-          pep_require_popp      on;
-        }
-        # Proxy OAuth Authorization Server metadata to Keycloak
-        # Served as: http(s)://<host>/.well-known/oauth-authorization-server
-        # Target:   http://authserver/auth/realms/zeta-guard/.well-known/zeta-guard-well-known
-        location = /.well-known/oauth-authorization-server {
-          proxy_pass         http://authserver/auth/realms/zeta-guard/.well-known/zeta-guard-well-known;
-          proxy_http_version 1.1;
-        }
-        location /.well-known/ {
-          default_type  application/json;
-          alias         /srv/.well-known/;
-          autoindex     off;
-        }
-        {{- if .Values.pepproxy.asl_enabled }}
-        location /CertData. {
-            asl on;
-            pep off;
-        }
-        location /ASL {
-          pep                   on;
-          asl                   on;
-          pep_require_aud       {{ .Values.pepproxy.nginxConf.requiredAudience }};
-          # pep_require_scope     "{{ join " " .Values.pepproxy.nginxConf.requiredScopes }}";
-          # pep_leeway           60; # s
-        }
-        {{- end }}
   pepproxyMetricsEnabled: true
   pepproxyTracingEnabled: true
   telemetryGatewayEnabled: true

@@ -1,12 +1,4 @@
 {{- if .Values.opa.enabled }}
-# Decide if we should render opa-config as a Secret when credentials are present
-{{- $cred := .Values.opa.bundle.credentials }}
-{{- $renderConfigAsSecret := false }}
-{{- if and .Values.opa.bundle.enabled $cred }}
-  {{- if and $cred.secretRef $cred.secretRef.name }}
-    {{- $renderConfigAsSecret = true }}
-  {{- end }}
-{{- end }}
 {{- if not .Values.opa.bundle.enabled }}
 ---
 apiVersion: v1
@@ -22,19 +14,13 @@ data:
 {{- if or .Values.opaPolicy.logDecisions .Values.opa.bundle.enabled }}
 ---
 apiVersion: v1
-kind: {{ ternary "Secret" "ConfigMap" $renderConfigAsSecret }}
+kind: ConfigMap
 metadata:
   name: opa-config
   labels:
     {{- include "opa.labels" . | nindent 4 }}
-{{- if $renderConfigAsSecret }}
-type: Opaque
-stringData:
-  opa.yaml: |
-{{- else }}
 data:
   opa.yaml: |
-{{- end }}
 {{- if .Values.opa.bundle.enabled }}
 {{ include "opa.bundleConfigYaml" . | indent 4 }}
 {{- else }}
@@ -45,19 +31,13 @@ data:
 {{- if and .Values.opa.simulation.enabled (or .Values.opaPolicy.logDecisions .Values.opa.bundle.enabled) }}
 ---
 apiVersion: v1
-kind: {{ ternary "Secret" "ConfigMap" $renderConfigAsSecret }}
+kind: ConfigMap
 metadata:
   name: opa-simulation-config
   labels:
     {{- include "opaSimulation.labels" . | nindent 4 }}
-{{- if $renderConfigAsSecret }}
-type: Opaque
-stringData:
-  opa.yaml: |
-{{- else }}
 data:
   opa.yaml: |
-{{- end }}
 {{- if .Values.opa.bundle.enabled }}
 {{ include "opa.bundleConfigYaml" (dict "ctx" . "bundleResource" (include "opa.simBundleResource" .)) | indent 4 }}
 {{- else }}

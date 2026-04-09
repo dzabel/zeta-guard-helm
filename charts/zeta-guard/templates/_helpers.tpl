@@ -58,6 +58,28 @@ app.kubernetes.io/name: authserver
 {{- end -}}
 
 {{/*
+  Helper: authserver.provisioningProcessor.image
+  Builds the full image reference including registry, repository and tag.
+*/}}
+{{- define "authserver.provisioningProcessor.image" -}}
+{{- $registry := default (printf "%s%s" .Values.global.registry_host .Values.registry_name) .Values.authserver.provisioningProcessor.image.registry -}}
+{{- printf "%s%s" $registry .Values.authserver.provisioningProcessor.image.repository -}}
+{{- if .Values.authserver.provisioningProcessor.image.tag }}:{{ .Values.authserver.provisioningProcessor.image.tag }}{{ end }}
+{{- if .Values.authserver.provisioningProcessor.image.digest }}@{{ .Values.authserver.provisioningProcessor.image.digest }}{{ end }}
+{{- end -}}
+
+{{/*
+  Helper: opa.provisioningProcessor.image
+  Builds the full image reference including registry, repository and tag.
+*/}}
+{{- define "opa.provisioningProcessor.image" -}}
+{{- $registry := default (printf "%s%s" .Values.global.registry_host .Values.registry_name) .Values.opa.provisioningProcessor.image.registry -}}
+{{- printf "%s%s" $registry .Values.opa.provisioningProcessor.image.repository -}}
+{{- if .Values.opa.provisioningProcessor.image.tag }}:{{ .Values.opa.provisioningProcessor.image.tag }}{{ end }}
+{{- if .Values.opa.provisioningProcessor.image.digest }}@{{ .Values.opa.provisioningProcessor.image.digest }}{{ end }}
+{{- end -}}
+
+{{/*
   Helper: authserver.kcDb
   Resolves the KC_DB value depending on databaseMode.
   Used by: authserver/authserver-deployment.yaml

@@ -43,11 +43,20 @@ spec:
         - name: nginx
           image: "{{ include "pep-proxy.image" . | trim }}"
           imagePullPolicy: "{{ .Values.pepproxy.imagePullPolicy }}"
+          {{- with .Values.pepproxy.hsmProxyAddr }}
+          env:
+            - name: HSM_PROXY_ADDR
+              value: {{ . }}
+          {{- end }}
           ports:
             - name: http-main
               containerPort: 8081
             - name: status
               containerPort: 8080
+          {{- if .Values.pepproxy.hsmProxyAddr }}
+            - name: http-tls
+              containerPort: 8443
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /status
@@ -221,6 +230,11 @@ spec:
     - name: http
       port: 80
       targetPort: http-main
+    {{- if .Values.pepproxy.hsmProxyAddr }}
+    - name: https
+      port: 443
+      targetPort: http-tls
+    {{- end }}
     {{- if .Values.pepproxyMetricsEnabled }}
     - name: metrics
       port: 9113

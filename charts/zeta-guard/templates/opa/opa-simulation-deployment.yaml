@@ -48,6 +48,32 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: trust-anchor-provisioning-processor
+          image: "{{ include "opa.provisioningProcessor.image" . | trim }}"
+          imagePullPolicy: "{{ .Values.opa.provisioningProcessor.imagePullPolicy }}"
+          {{- with .Values.opa.provisioningProcessor.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: RESULT_DIR
+              value: "/var/trust-data"
+            - name: PROCESSORS_POLICY_SIGNER_ENABLED
+              value: "true"
+            - name: TRUST_CERTCHAIN_FILE
+              value: "/var/image-trustchain/certchain.pem"
+          {{- with .Values.opa.provisioningProcessor.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: trust-data
+              mountPath: "/var/trust-data"
+              readOnly: false
+            - name: image-trustchain
+              mountPath: "/var/image-trustchain"
+              readOnly: true
       containers:
         - name: opa-simulation
           {{- with .Values.opa.containerSecurityContext }}
@@ -59,11 +85,20 @@ spec:
           env:
             - name: CHECKSUM_OPA
               value: "{{ list $inlinePolicy (include "opa.configYaml" .) $bundleCfg | toJson | sha256sum }}"
+          {{- if and .Values.opa.bundle.enabled .Values.opa.bundle.credentials.secretRef.name }}
+            - name: CREDENTIAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opa.bundle.credentials.secretRef.name }}
+                  key: token
+          {{- end }}
           args:
             - "run"
             - "--server"
             - "--addr=0.0.0.0:8181"
             - "--log-level={{ .Values.opa.logLevel }}"
+            - --set-file
+            - keys.signer.key=/var/trust-data/policy-signer.pub
             {{- if or .Values.opaPolicy.logDecisions .Values.opa.bundle.enabled }}
             - "--config-file=/config/opa.yaml"
             {{- end }}
@@ -111,6 +146,9 @@ spec:
             {{- end }}
             - name: opa-persistence
               mountPath: /var/opa
+            - name: trust-data
+              mountPath: "/var/trust-data"
+              readOnly: true
       volumes:
         {{- if not .Values.opa.bundle.enabled }}
         - name: opa-policy
@@ -118,25 +156,17 @@ spec:
             name: opa-policy
         {{- end }}
         {{- if or .Values.opaPolicy.logDecisions .Values.opa.bundle.enabled }}
-        {{/* Decide if opa-config is a Secret based on presence of SecretRef credentials */}}
-        {{- $cred := .Values.opa.bundle.credentials }}
-        {{- $configIsSecret := false }}
-        {{- if and .Values.opa.bundle.enabled $cred }}
-          {{- if and $cred.secretRef $cred.secretRef.name }}
-            {{- $configIsSecret = true }}
-          {{- end }}
-        {{- end }}
         - name: opa-simulation-config
-          {{- if $configIsSecret }}
-          secret:
-            secretName: opa-simulation-config
-          {{- else }}
           configMap:
             name: opa-simulation-config
-          {{- end }}
         {{- end }}
         - name: opa-persistence
           emptyDir: {}
+        - name: trust-data
+          emptyDir: {}
+        - name: image-trustchain
+          secret:
+            secretName: {{ required "SecretRef for image verification certchain is missing, see imageTrustCertchainSecretRef" .Values.imageTrustCertchainSecretRef }}
         {{- if and .Values.opa.bundle.enabled (and $wif $wif.enabled) }}
         - name: gcp-token-volume
           secret:

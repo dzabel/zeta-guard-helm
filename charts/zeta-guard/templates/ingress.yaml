@@ -11,8 +11,11 @@ metadata:
     {{- if .Values.nginxIngressEnabled }}
     nginx.org/mergeable-ingress-type: "minion"
     nginx.org/websocket-services: {{ .Values.routeViaTigerProxy | ternary "tiger-proxy" "pep-proxy-svc" }}
-    {{- if .Values.pepproxy.sessionAffinity.enabled }}
+    {{- if .Values.ingress.sessionAffinity.enabled }}
     nginx.org/lb-method: "hash $http_x_forwarded_for consistent"
+    {{- end }}
+    {{- if and (or .Values.authserver.hsm.tls.enabled .Values.authserver.tls.enabled) (not .Values.routeViaTigerProxy) }}
+    nginx.org/ssl-services: "authserver"
     {{- end }}
     {{- end }}
     {{- with .Values.ingressMinionAnnotations }}
@@ -20,6 +23,12 @@ metadata:
     {{- end }}
 spec:
   ingressClassName: {{ .Values.ingressClassName }}
+  {{- if .Values.openshiftIngress.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.authserver.hostname | quote }}
+      secretName: {{ .Values.openshiftIngress.certName }}
+  {{- end }}
   rules:
     - {{- if .Values.authserver.hostname }}
       host: {{ .Values.authserver.hostname | quote }}
@@ -37,7 +46,11 @@ spec:
                 {{- else }}
                 name: authserver
                 port:
+                  {{- if or .Values.authserver.hsm.tls.enabled .Values.authserver.tls.enabled }}
+                  name: https
+                  {{- else }}
                   name: http
+                  {{- end }}
                 {{- end }}
           - path: /
             pathType: Prefix

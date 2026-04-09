@@ -2,6 +2,54 @@
 
 # Release Notes ZETA Guard Helm Charts
 
+## Release 0.5.3
+
+### changed:
+
+- authserver 0.5.1
+- hsm_sim 0.5.0
+
+## Release 0.5.2
+
+### added:
+ 
+- authserver hsm support (TLS)
+- upgrade cert-manager v1.20.1
+- hsm_sim 0.5.0 disabled by default
+
+## Release 0.5.1
+
+### added:
+
+- pep hsm support (TLS)
+
+## Release 0.5.0
+
+### added:
+
+- Description and examples for more or less all values in `charts/zeta-guard/values.schema.json`
+- Support configuration of OCSP stapling for ASL
+- Option to enable or disable no-travel enforcement
+- Option to deploy hsm proxy simulator for the test setup
+- Provisioning Processor (run in sidecars) that downloads the provisioning container from gematik and derives the trust anchors from it.
+- Terraform configuration now supports Kubernetes and local operating modes. Set `use_kubernetes = true` (default) to store state in a K8s Secret and fetch credentials from the cluster, or `use_kubernetes = false` to use a local state file and explicit credentials. See [How to configure authserver](docs/how-to_guides/How_to_configure_authserver.md).
+- Terraform variable validations for `keycloak_namespace`, `keycloak_url`, `pdp_scopes`, and a cross-variable check that credentials are provided in local mode
+
+### changed:
+
+- Replaced OpenShift Route (`openshiftRoute`) with Ingress-based TLS support (`openshiftIngress`). The custom `openshift-route.yaml` template has been removed. Migrate from `openshiftRoute.enabled` / `openshiftRoute.host` / `openshiftRoute.issuer` to `openshiftIngress.enabled` + `openshiftIngress.certName`. This works with OpenShift's Ingress-to-Route controller and creates edge-terminated routes with TLS redirect.
+- Testdriver ingress is now configurable: added `ingressEnabled`, `nginxIngressEnabled`, and `openshiftIngress` toggles to the testdriver subchart.
+- Fixed configuration of telemetry-collector in `local-test/values.local.yaml`.
+- Fixed erroneous TLS configuration for telemetry-gateway.
+- You can now provide your own secrets to the zeta-guard sub chart instead of having them created. 
+- Make it optional for the chart to deploy secrets. It's now possible to reference existing secrets.
+- `managePolicies.sh` now uses the Keycloak REST API (`curl`+`jq`) instead of `kubectl exec` + `kcadm.sh` into the Keycloak pod. No Java or Keycloak CLI installation required.
+- `main.tf` is now generated dynamically from templates and gitignored; the backend block is selected based on `use_kubernetes`
+- Keycloak admin username and password are resolved dynamically in both the Terraform provider and the policy management script
+- `keycloak_password` and `keycloak_username` are now both marked `sensitive` in Terraform variables
+- Keycloak provider version constraint updated to `>= 5.7.0`
+- Updated OpenTelemetry collector to version 0.149.0.
+
 ## Release 0.4.1
 
 ### added:

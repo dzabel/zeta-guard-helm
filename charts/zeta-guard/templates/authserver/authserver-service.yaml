@@ -14,6 +14,11 @@ spec:
     - name: mgmt-interface
       port: 9000
       targetPort: http-mgmt-port
+    {{- if or .Values.authserver.hsm.tls.enabled .Values.authserver.tls.enabled }}
+    - name: https
+      port: 443
+      targetPort: https-port
+    {{- end }}
     {{- if .Values.devMode }}
     - name: jdwp
       port: 5005

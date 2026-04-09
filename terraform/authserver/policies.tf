@@ -8,8 +8,14 @@ data "external" "manage_policies" {
   ]
 
   query = {
-    namespace = var.keycloak_namespace
-    password  = var.keycloak_password
+    keycloak_url = var.keycloak_url
+    insecure_tls = tostring(var.insecure_tls)
+    username = var.use_kubernetes ? (
+      var.keycloak_username != "" ? var.keycloak_username : data.kubernetes_secret_v1.keycloak_admin[0].data["username"]
+    ) : var.keycloak_username
+    password = var.keycloak_password != "" ? var.keycloak_password : (
+      var.use_kubernetes ? data.kubernetes_secret_v1.keycloak_admin[0].data["password"] : ""
+    )
 
     delete_policies = jsonencode([
       "Trusted Hosts",
@@ -17,7 +23,6 @@ data "external" "manage_policies" {
       "Consent Required"
     ])
 
-    policy_name_add = "𝛇-Guard user clients limit"
     provider_id_add = "zeta-client-registration-policy"
   }
 

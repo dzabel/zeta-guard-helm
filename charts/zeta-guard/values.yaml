@@ -9,11 +9,43 @@ registry_name: ""
 additionalLabels: {}
 
 authserver:
+  provisioningProcessor:
+    image:
+      repository: provisioning-processor
+      tag: 0.5.0
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cpu: "1"
+        memory: "200Mi"
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
+  initContainer:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
+  container:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop: [ "ALL" ]
   replicaCount: 1
   genesisHash:
   image:
     repository: keycloak-zeta
-    tag: 0.4.1
+    tag: 0.5.1
   imagePullPolicy: Always
   imagePullSecrets: [ ]
   # authserver.podLabels is a map of labels to add to the authserver pod.
@@ -33,6 +65,23 @@ authserver:
   admin:
     username: admin
     password:
+  hsm:
+    # enabled activates the HSM key-load at authserver startup (sets HSM_PROXY_ENDPOINT / HSM_PROXY_KEY_ID).
+    # When false, the HsmProxyKeycloakFactory SPI is a no-op and no HSM is required at runtime.
+    enabled: false
+    endpoint: ""  # gRPC address of the HSM Proxy, e.g. "host:port"
+    keyId: ""     # Key identifier in the HSM, e.g. "zeta-guard-keycloak-tls-es256-v1.p256"
+    tls:
+      # pod-level HTTPS on port 8443 using the HSM-backed key.
+      # Requires authserver.hsm.enabled: true and a running HSM Proxy.
+      # startup.sh generates /opt/keycloak/conf/hsm-keystore.properties from HSM_PROXY_* env vars automatically.
+      enabled: false
+  tls:
+    # pod-level HTTPS on port 8443 using a cert/key from a Kubernetes Secret.
+    # The Secret must contain keys tls.crt and tls.key (standard kubernetes.io/tls format).
+    enabled: false
+    # certSecretName is the name of the Kubernetes Secret holding tls.crt and tls.key.
+    certSecretName: ""
   config:
     maxClients: "256"
     clientRegistrationTTL: "PT5M"
@@ -72,7 +121,7 @@ pepproxy:
   replicaCount: 1
   image:
     repository: ngx_pep
-    tag: 0.4.0
+    tag: 0.5.1
   imagePullPolicy: Always
   imagePullSecrets: [ ]
   # pepproxy.podLabels is a map of labels to add to the pepproxy pod.
@@ -90,7 +139,12 @@ pepproxy:
   #
   #aslRootCA: "GEM.RCA7 TEST-ONLY"
   #
-  #aslOcspUrl: "http://example.org/ocsp"
+  # specify an override OCSP URL to use instead of certificate default, or "off" to disable stapling
+  # aslOcsp: "http://example.org/ocsp"
+  #
+  # change maximum validity of cached OCSP responses (default 24h per A_24624-01)
+  # alsOcspTtl: 5m
+  #
   nginxConf:
     configMapName: pep-nginx-conf
     generateConfigMap: false
@@ -100,11 +154,16 @@ pepproxy:
     # enables ASL test mode. This will practically disable encryption! NEVER USE IN PRODUCTION!
     aslTestmode: false
 
+    # enable (true) or disable (false) no-travel enforcement
+    noTravel: false
+
     # fachdienstUrl defines the fachdienst url to be used for the pep-proxy.
     fachdienstUrl: ""
 
     # JWKS issuer for PoPP key validation.
-    poppIssuer: ""
+    # If set, all locations default to `pep_require_popp on;`.
+    # Set to null to disable PoPP.
+    poppIssuer: null
 
     # OIDC issuer (iss) of the authorization server (e.g., zeta-guard-realm).
     pepIssuer: ""
@@ -114,12 +173,13 @@ pepproxy:
 
     # requiredScopes defines scopes required for a valid access token.
     requiredScopes: [ ]
+    locations: ""
+  # set to gRPC URL of HSM Proxy to enable ossl_hsm integration
+  hsmProxyAddr: null
   # podAnnotations is for setting additional Kubernetes Annotations to a Pod.
   podAnnotations: {}
   affinity: {}
   tolerations: []
-  sessionAffinity:
-    enabled: false  # set to true when replicaCount > 1; uses ip-hash (X-Forwarded-For) via NIC
 
 # pepproxyMetricsEnabled enables the metrics endpoint for Keycloak
 pepproxyMetricsEnabled: true
@@ -138,7 +198,6 @@ routeViaTigerProxy: false
 # When enabled, injects a changing annotation to force pod rollouts
 # on each helm upgrade/apply even if image tag is unchanged.
 devMode: false
-
 
 # DB mode switch:
 # - cloudnative: managed by CloudNativePG operator
@@ -197,6 +256,9 @@ ingressClassName: "nginx"
 ingressEnabled: true
 ingressMasterAnnotations: { }
 ingressMinionAnnotations: { }
+ingress:
+  sessionAffinity:
+    enabled: false  # set to true when replicaCount > 1; uses ip-hash (X-Forwarded-For) via NIC
 
 # If nginxIngressEnabled is true, the nginx-ingress controller is deployed and Ingresses receive annotations.
 nginxIngressEnabled: true
@@ -274,6 +336,18 @@ opa:
       publicKey: ""
       # Optional: must match the scope embedded in the bundle signature. Omit if bundle was signed without a scope.
       scope: ""
+  provisioningProcessor:
+    image:
+      repository: provisioning-processor
+      tag: 0.5.0
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cpu: "1"
+        memory: "200Mi"
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
   simulation:
     enabled: true
     replicaCount: 1
@@ -397,13 +471,11 @@ opaPolicy:
       },
     }
 
-# Add openshift route
-openshiftRoute:
+# Use OpenShift Ingress Route-Controller with tls; will create edge-terminiated routes with tls-redirect
+openshiftIngress:
   enabled: false
-#  host:
-#  issuer:
-#    issuerName:
-#    secretName:
+  certName: ""
+
 
 # telemetryGatewayEnabled adds the telemetry gateway to the helm release
 telemetryGatewayEnabled: true
@@ -412,6 +484,8 @@ telemetry-gateway:
   mode: deployment
   image:
     repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    # ToDo when you update the chart version, remove this value
+    tag: 0.149.0
   command:
     name: otelcol-k8s
   resources:
@@ -424,11 +498,7 @@ telemetry-gateway:
   config:
     exporters:
       otlp_grpc/gematik:
-        endpoint: otlp.v1.bd.prod.ccs.gematik.solutions:443
-        tls:
-          cert_file: "/etc/tls/tls.crt"
-          key_file: "/etc/tls/tls.key"
-          reload_interval: 24h
+        endpoint: https://otlp.v1.bd.prod.ccs.gematik.solutions:443
         auth:
           authenticator: bearertokenauth/gematik
 
@@ -581,16 +651,10 @@ telemetry-gateway:
     - name: gcp-token
       mountPath: /etc/gcp
       readOnly: true
-    - name: tls
-      mountPath: /etc/tls
-      readOnly: true
   extraVolumes:
     - name: gcp-token
       secret:
         secretName: gematik-oidc-token
-    - name: tls
-      secret:
-        secretName: zeta-guard-tls
 
   ports:
     jaeger-compact:

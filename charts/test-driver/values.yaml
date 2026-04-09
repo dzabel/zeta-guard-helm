@@ -7,7 +7,7 @@ registry_name: ""
 
 image:
   repository: testdriver-image
-  tag: v0.4.1
+  tag: v0.5.1
 imagePullPolicy: Always
 
 containerPort: 8080
@@ -25,8 +25,19 @@ devMode: false
 # instead of directly exposing internal services.
 routeViaTigerProxy: false
 
+# Toggle ingress deployment
+ingressEnabled: true
+
 # Ingress settings (used when deploying a NIC minion Ingress for the test-driver)
 ingressClassName: "nginx"
+
+# Use nginx ingress controller for ingress
+nginxIngressEnabled: true
+
+# Use OpenShift ingress controller with tls; created routes will use https
+openshiftIngress:
+  enabled: false
+  certName: ""
 
 # Path to the PKCS12 keystore file containing the SMC-B certificate
 smcbCertificateFileName: ""

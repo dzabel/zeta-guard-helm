@@ -1,7 +1,6 @@
 # Values for the umbrella chart (local environment with KIND)
 
 global:
-  registry: europe-west3-docker.pkg.dev/gematik-pt-zeta-prod/zeta-dcr/
   registry_host: "europe-west3-docker.pkg.dev/gematik-pt-zeta-prod/zeta-dcr/"
 
 tags:
@@ -10,6 +9,7 @@ tags:
   tiger-proxy: true
   tiger-testsuite: true
   zeta-guard: true
+  zeta-tls-test-tool-service: false
 
 exauthsim:
   containerSecurityContext:
@@ -68,7 +68,7 @@ testdriver:
   fachdienst_url: "https://zeta-kind.local/pep/"
   hostname: zeta-kind.local
   image:
-    tag: v0.4.1
+    tag: v0.5.1
   ingressClassName: nginx
   PoppToken: "eyJhbGciOiJFUzI1NiIsInR5cCI6InZuZC50ZWxlbWF0aWsucG9wcCtqd3QiLCJraWQiOiJhbGlhcyIsIng1YyI6WyJNSUlEQmpDQ0FxeWdBd0lCQWdJSEFtQ25LeHIvUnpBS0JnZ3Foa2pPUFFRREFqQ0JoREVMTUFrR0ExVUVCaE1DUkVVeEh6QWRCZ05WQkFvTUZtZGxiV0YwYVdzZ1IyMWlTQ0JPVDFRdFZrRk1TVVF4TWpBd0JnTlZCQXNNS1V0dmJYQnZibVZ1ZEdWdUxVTkJJR1JsY2lCVVpXeGxiV0YwYVd0cGJtWnlZWE4wY25WcmRIVnlNU0F3SGdZRFZRUUREQmRIUlUwdVMwOU5VQzFEUVRZeElGUkZVMVF0VDA1TVdUQWVGdzB5TlRBM01qZ3lNakF3TURCYUZ3MHpNREEzTWpneU1UVTVOVGxhTUdzeEN6QUpCZ05WQkFZVEFrUkZNU1l3SkFZRFZRUUtEQjFuWlcxaGRHbHJJRlJGVTFRdFQwNU1XU0F0SUU1UFZDMVdRVXhKUkRFME1ESUdBMVVFQXd3cmNHOXdjQzEwYjJ0bGJpNW5aVzFoZEdsckxuUmxiR1Z0WVhScGF5MTBaWE4wSUhOcGJYVnNZWFJ2Y2pCWk1CTUdCeXFHU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkhBdkkzclBpTTRVNUhCekhUSXllc24vWmNaUkh0djlWeHVqbGJUYVJQdHYyc3FPNXZ5dmEyNEVRbjhBZ1M2bU9ObmVSaElJOHFoUkxxL1ZJMDZEeE9HamdnRWZNSUlCR3pBN0JnZ3JCZ0VGQlFjQkFRUXZNQzB3S3dZSUt3WUJCUVVITUFHR0gyaDBkSEE2THk5bGFHTmhMbWRsYldGMGFXc3VaR1V2WldOakxXOWpjM0F3SFFZRFZSME9CQllFRkRobnRHbnFueEVRTnpRdkRTTUpLSFllRUROYU1DRUdBMVVkSUFRYU1CZ3dDZ1lJS29JVUFFd0VnaDh3Q2dZSUtvSVVBRXdFZ1NNd0h3WURWUjBqQkJnd0ZvQVVuelhnTUtsL3l2aG1uNUFLUXMyN2dXV2ZTZjR3RGdZRFZSMFBBUUgvQkFRREFnWkFNRnNHQlNza0NBTURCRkl3VURCT01Fd3dTakJJTURvTU9GUnZhMlZ1TFZOcFoyNWhkSFZ5TFVsa1pXNTBhWFREcEhRZ1pzTzhjaUJRY205dlppQnZaaUJRWVhScFpXNTBJRkJ5WlhObGJtTmxNQW9HQ0NxQ0ZBQk1CSUpBTUF3R0ExVWRFd0VCL3dRQ01BQXdDZ1lJS29aSXpqMEVBd0lEU0FBd1JRSWhBS3VDdi9ZczBMd3lQRTh2eVBZWVF5UFpBTGltendwRjJHallVWUlwZ3QyNUFpQUhucVpubEV0dEhzL0Y0SEExckYyZWNmMjd0L2NMMlM4b0VvSFZaMmpra2c9PSJdfQ.eyJpYXQiOjE3NTM4NzcwNDAsInZlcnNpb24iOiIxLjAuMCIsImlzcyI6Imh0dHBzOi8vcG9wcC5leGFtcGxlLmNvbSIsInByb29mTWV0aG9kIjoiZWhjLXByYWN0aXRpb25lci11c2VyLXg1MDkiLCJwYXRpZW50UHJvb2ZUaW1lIjoxNzUzODc3MDMwLCJwYXRpZW50SWQiOiJYMTEwNjM5NDkxIiwiaW5zdXJlcklkIjoiMTA5NTAwOTY5IiwiYWN0b3JJZCI6IjEtMjAwMTQwNjA2MjUiLCJhY3RvclByb2Zlc3Npb25PaWQiOiIxLjIuMjc2LjAuNzYuNC4zMiJ9.izyGU8HxdiX98aTMCbVQfk9zetPT52cNnVEiTEtvHXN3KislKh3mds5WtE7F2pDxM6_X_M3seHQ6QZWk_NefVA"
   routeViaTigerProxy: true
@@ -89,6 +89,8 @@ testfachdienst:
       value: "true"
   image:
     tag: 0.4.0
+
+testMonitoringServiceEnabled: false
 
 testMonitoringService:
   ingressRulesHost: "zeta-kind.local"
@@ -209,25 +211,36 @@ zeta-guard:
       password: local-dev-password
     config:
       maxClients: "5000"
-    initContainerSecurityContext:
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: false
-      runAsNonRoot: true
-      runAsUser: 1000
-      capabilities:
-        drop: [ "ALL" ]
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      runAsNonRoot: true
-      runAsUser: 1000
-      capabilities:
-        drop: [ "ALL" ]
     genesisHash: 4841c2142fef441daa6ee6c57db65c011935964b14e94a6c8f5ec0447b83526c
+    provisioningProcessor:
+      image:
+        tag: 0.5.0
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop: [ "ALL" ]
+    initContainer:
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop: [ "ALL" ]
+    container:
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop: [ "ALL" ]
     hostname: zeta-kind.local
-    http_enabled: true
     image:
-      tag: 0.4.0
+      tag: 0.5.1
     imagePullPolicy: IfNotPresent
     log:
       level: "INFO,de.gematik.zeta.zetaguard:debug"
@@ -266,6 +279,19 @@ zeta-guard:
       serviceName: gar
       url: https://europe-west3-docker.pkg.dev
       resource: "<PROJECT_ID>/opa-bundles/zeta-authz:latest"
+      verification:
+        enabled: false
+        keyId: signer
+    provisioningProcessor:
+      image:
+        tag: 0.5.0
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop: [ "ALL" ]
     containerSecurityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
@@ -292,7 +318,7 @@ zeta-guard:
       capabilities:
         drop: [ "ALL" ]
     image:
-      tag: 0.4.0
+      tag: 0.5.1
     nginxConf:
       generateConfigMap: true
       pepIssuer: https://zeta-kind.local/auth/realms/zeta-guard
@@ -313,19 +339,36 @@ zeta-guard:
       capabilities:
         drop: [ "ALL" ]
     config:
+      processors:
+        batch:
+          timeout: 5s
       exporters:
-        otlp_grpc/test-monitoring-service:
-          endpoint: test-monitoring-collector-local:4317
+        otlp_http/test-monitoring-service:
+          endpoint: http://test-monitoring-collector-local:4318
+          tls:
+            insecure: true
       service:
         extensions:
           - health_check
         pipelines:
           logs:
+            processors:
+              - redaction/betreiber
+              - memory_limiter
+              - batch
             exporters:
               - otlp_http/test-monitoring-service
           metrics:
+            processors:
+              - redaction/betreiber
+              - memory_limiter
+              - batch
             exporters:
               - otlp_http/test-monitoring-service
           traces:
+            processors:
+              - redaction/betreiber
+              - memory_limiter
+              - batch
             exporters:
               - otlp_http/test-monitoring-service
